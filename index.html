@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Patrimônio Hospitalar</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2317718f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7Z'/%3E%3C/svg%3E"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="bg-slate-100 text-slate-800">
+    <div id="root">
+      <!-- Aviso exibido só se o JavaScript do app não carregar -->
+      <div id="fallback" style="display:none;padding:24px;font-family:system-ui,sans-serif;max-width:640px">
+        <h1 style="font-size:18px;font-weight:600">Não foi possível carregar a aplicação</h1>
+        <p id="fallback-msg" style="margin-top:8px;color:#475569"></p>
+      </div>
+    </div>
+    <noscript>Ative o JavaScript para usar o sistema.</noscript>
+    <script>
+      // Script clássico (funciona até em file://) que explica a tela branca.
+      (function () {
+        function show(msg) {
+          // O React substitui o conteúdo de #root ao renderizar; se #fallback
+          // ainda existe, o app não subiu.
+          var f = document.getElementById('fallback');
+          if (!f) return;
+          document.getElementById('fallback-msg').textContent = msg;
+          f.style.display = 'block';
+        }
+        if (location.protocol === 'file:') {
+          show(
+            'A página foi aberta direto do disco (file://), e o navegador bloqueia módulos nesse modo. ' +
+              'Rode "npm run dev" (desenvolvimento) ou "npm run build && npm run preview" e abra o endereço http://localhost mostrado no terminal.'
+          );
+          return;
+        }
+        window.addEventListener('load', function () {
+          setTimeout(function () {
+            show(
+              'O JavaScript do app não foi encontrado. No GitHub, em Settings → Pages, deixe a fonte (Source) como "GitHub Actions" ' +
+                'e confira em Actions se a última publicação terminou com sucesso. Publicar a raiz do repositório causa tela branca.'
+            );
+          }, 1500);
+        });
+      })();
+    </script>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
