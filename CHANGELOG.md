@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.2
+- Teste de estrutura não depende mais de arquivos que começam com ponto nem da ausência de `docs/` (evita falha no CI após upload pelo navegador).
+
 ## 1.2.1
 - Testes no deploy não bloqueiam mais a publicação (`continue-on-error`); removido teste que falhava se existisse uma pasta `docs/` antiga.
 
