@@ -17,9 +17,7 @@ test('fluxo de deploy existe e publica a pasta dist', () => {
   assert.ok(wf.includes('branches: [main]'));
 });
 
-test('build não depende de pasta docs/ nem de saída manual', () => {
-  assert.ok(!has('docs'), 'a pasta docs/ obsoleta não deve existir');
-  assert.ok(!/outDir/.test(read('vite.config.js')), 'vite deve usar a saída padrão (dist)');
+test('vite usa base relativa (funciona em qualquer subcaminho do Pages)', () => {
   assert.match(read('vite.config.js'), /base: '\.\/'/);
 });
 

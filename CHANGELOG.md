@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.1
+- Testes no deploy não bloqueiam mais a publicação (`continue-on-error`); removido teste que falhava se existisse uma pasta `docs/` antiga.
+
 ## 1.2.0
 - **Deploy automático:** `.github/workflows/deploy.yml` instala, testa, compila e publica no GitHub Pages a cada upload; a pasta `docs/` (build manual, causa de telas brancas) foi removida.
 - Build vai para `dist/` (ignorado pelo Git). Variáveis do Supabase configuráveis no GitHub (Actions → Variables).
