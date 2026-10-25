@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Database, Download, RotateCcw, Trash2, Upload } from 'lucide-react';
 import { useData } from '../context/DataContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import ConfirmModal from '../components/ui/ConfirmModal.jsx';
 import { downloadFile } from '../lib/download.js';
+import { plural } from '../lib/format.js';
 
 export default function SettingsPage() {
   const { data, actions, mode, persistent, capabilities, can } = useData();
@@ -12,6 +13,16 @@ export default function SettingsPage() {
   const toast = useToast();
   const fileRef = useRef(null);
   const [confirm, setConfirm] = useState(null); // 'reset' | 'clear' | { import: obj }
+
+  // O estado guarda só os eventos recentes; o total vem de uma contagem leve.
+  const [eventCount, setEventCount] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    actions.countEvents().then((n) => alive && setEventCount(n)).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [actions, data.events]);
 
   const exportBackup = async () => {
     const dump = await actions.exportData();
@@ -40,7 +51,8 @@ export default function SettingsPage() {
         <div className="space-y-2 px-4 py-4 text-sm text-slate-600">
           <p>
             Modo atual: <strong>{local ? 'Local (neste navegador)' : 'Online (Supabase)'}</strong> —{' '}
-            {data.assets.length} ativos, {data.sectors.length} setores, {data.events.length} movimentações.
+            {plural(data.assets.length, 'ativo', 'ativos')}, {plural(data.sectors.length, 'setor', 'setores')},{' '}
+            {eventCount == null ? '…' : plural(eventCount, 'movimentação', 'movimentações')}.
           </p>
           {local ? (
             <>
@@ -49,7 +61,7 @@ export default function SettingsPage() {
                   ? 'Os dados ficam salvos apenas neste navegador e neste computador. Limpar os dados do site apaga tudo — faça backups periódicos.'
                   : 'O armazenamento do navegador está indisponível (modo privado ou bloqueado): os dados valem só até fechar esta aba.'}
               </p>
-              <p className="text-slate-400">
+              <p className="text-slate-500">
                 Para compartilhar os dados entre várias pessoas e computadores, configure o Supabase (veja FASE-2-SUPABASE.md).
               </p>
             </>

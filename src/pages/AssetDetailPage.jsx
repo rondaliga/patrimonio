@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Ban, BadgeCheck, LogIn, LogOut, Pencil, Trash2, Wrench } from 'lucide-react';
 import { useData } from '../context/DataContext.jsx';
 import StatusBadge from '../components/ui/StatusBadge.jsx';
@@ -19,7 +19,7 @@ import { navigate } from '../router/hashRouter.js';
 function Info({ label, children }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</dt>
+      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
       <dd className="mt-0.5 text-sm text-slate-800">{children || '—'}</dd>
     </div>
   );
@@ -29,6 +29,21 @@ export default function AssetDetailPage({ tag }) {
   const { data, actions, getAsset, sectorName, can } = useData();
   const [modal, setModal] = useState(null);
   const asset = getAsset(tag);
+
+  // O estado global guarda só os eventos recentes; o histórico completo deste ativo vem sob demanda
+  // (e é buscado de novo quando o ativo muda, ex.: após um check-in).
+  const [full, setFull] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    actions.eventsFor(tag).then((h) => alive && setFull(h)).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [tag, asset, actions]);
+  const history = useMemo(
+    () => full ?? data.events.filter((e) => e.tag === tag).sort((a, b) => b.at.localeCompare(a.at)),
+    [full, data.events, tag]
+  );
 
   if (!asset) {
     return (
@@ -40,8 +55,7 @@ export default function AssetDetailPage({ tag }) {
   }
 
   const close = () => setModal(null);
-  const history = data.events.filter((e) => e.tag === asset.tag).sort((a, b) => b.at.localeCompare(a.at));
-  const deletable = canDelete(asset, data.events);
+  const deletable = full !== null && canDelete(asset, full);
   const s = asset.status;
 
   return (
@@ -117,7 +131,7 @@ export default function AssetDetailPage({ tag }) {
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">Histórico de movimentações</h2>
-          <span className="text-xs text-slate-400">{history.length} {history.length === 1 ? 'registro' : 'registros'}</span>
+          <span className="text-xs text-slate-500">{history.length} {history.length === 1 ? 'registro' : 'registros'}</span>
         </div>
         <ul className="divide-y divide-slate-100">
           {history.map((e) => {
@@ -129,7 +143,7 @@ export default function AssetDetailPage({ tag }) {
                 </span>
                 <div className="min-w-0">
                   <p className="text-sm text-slate-700">{describeEvent(e, e.sectorId ? sectorName(e.sectorId) : '')}</p>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500">
                     {fmtDateTime(e.at)}
                     {e.note ? ` · ${e.note}` : ''}
                   </p>

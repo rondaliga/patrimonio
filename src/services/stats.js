@@ -5,11 +5,19 @@ const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const zero = () => Object.fromEntries(STATUS_ORDER.map((s) => [s, 0]));
 
+const RECENT_LIMIT = 6;
+const dayKey = (d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+
+// Uma única passada sobre ativos e eventos (antes eram várias, incluindo 7 varreduras
+// dos eventos só para o gráfico semanal e uma ordenação completa para a atividade recente).
 export function computeStats({ assets, events, sectors, now = new Date() }) {
   const nowDate = new Date(now);
   const statusTotals = zero();
   const bySectorMap = new Map(sectors.map((s) => [s.id, { id: s.id, sector: s.name, byStatus: zero(), total: 0 }]));
+  const sectorNames = new Map(sectors.map((s) => [s.id, s.name]));
+  const sectorName = (id) => sectorNames.get(id) ?? '—';
 
+  const activeLoans = [];
   for (const a of assets) {
     statusTotals[a.status] += 1;
     const row = bySectorMap.get(a.sectorId);
@@ -17,43 +25,59 @@ export function computeStats({ assets, events, sectors, now = new Date() }) {
       row.byStatus[a.status] += 1;
       row.total += 1;
     }
+    if (a.status === 'in_use' && a.assignedTo) {
+      activeLoans.push({
+        tag: a.tag,
+        asset: a.name,
+        category: a.category,
+        user: a.assignedTo.user,
+        sector: sectorName(a.assignedTo.sectorId),
+        since: a.assignedTo.since,
+      });
+    }
   }
+  activeLoans.sort((x, y) => x.since.localeCompare(y.since));
 
-  const sectorName = (id) => sectors.find((s) => s.id === id)?.name ?? '—';
-  const activeLoans = assets
-    .filter((a) => a.status === 'in_use' && a.assignedTo)
-    .map((a) => ({
-      tag: a.tag,
-      asset: a.name,
-      category: a.category,
-      user: a.assignedTo.user,
-      sector: sectorName(a.assignedTo.sectorId),
-      since: a.assignedTo.since,
-    }))
-    .sort((x, y) => x.since.localeCompare(y.since));
-
+  // Últimos 7 dias (hoje por último): cada dia vira um "balde" identificado pela data local.
   const today = startOfDay(nowDate);
   const weekly = [];
+  const bucket = new Map();
   for (let i = 6; i >= 0; i--) {
-    const from = new Date(today);
-    from.setDate(from.getDate() - i);
-    const to = new Date(from);
-    to.setDate(to.getDate() + 1);
-    const value = events.filter((e) => e.type === 'checkout' && new Date(e.at) >= from && new Date(e.at) < to).length;
-    weekly.push({ day: WEEKDAYS[from.getDay()], value });
+    const day = new Date(today);
+    day.setDate(day.getDate() - i);
+    const slot = { day: WEEKDAYS[day.getDay()], value: 0 };
+    bucket.set(dayKey(day), slot);
+    weekly.push(slot);
   }
+  const weekStart = new Date(today);
+  weekStart.setDate(weekStart.getDate() - 6);
+  const weekStartMs = weekStart.getTime();
+  const weekEndMs = today.getTime() + 86400000 * 2; // folga p/ horário de verão; o balde decide
 
-  const recent = events
-    .filter((e) => e.type !== 'created' && e.type !== 'edited')
-    .sort((a, b) => b.at.localeCompare(a.at))
-    .slice(0, 6);
+  // Os 6 eventos mais recentes (exceto cadastro/edição), mantidos numa lista pequena e ordenada.
+  const recent = [];
+  for (const e of events) {
+    if (e.type === 'checkout') {
+      const ms = Date.parse(e.at);
+      if (ms >= weekStartMs && ms < weekEndMs) {
+        const slot = bucket.get(dayKey(new Date(ms)));
+        if (slot) slot.value += 1;
+      }
+    }
+    if (e.type === 'created' || e.type === 'edited') continue;
+    if (recent.length === RECENT_LIMIT && e.at <= recent[RECENT_LIMIT - 1].at) continue;
+    let i = recent.length;
+    while (i > 0 && recent[i - 1].at < e.at) i--;
+    recent.splice(i, 0, e);
+    if (recent.length > RECENT_LIMIT) recent.pop();
+  }
 
   return {
     total: assets.length,
     statusTotals,
     bySector: [...bySectorMap.values()],
     activeLoans,
-    weekly,
+    weekly: weekly.map(({ day, value }) => ({ day, value })),
     recent,
     radiosLoaned: activeLoans.filter((l) => l.category === 'radio').length,
     chairsLoaned: activeLoans.filter((l) => l.category === 'wheelchair').length,
@@ -64,7 +88,14 @@ export function computeStats({ assets, events, sectors, now = new Date() }) {
 export function loanDurations(events) {
   const open = new Map();
   const out = [];
-  for (const e of [...events].sort((a, b) => a.at.localeCompare(b.at))) {
+  let ordered = events;
+  for (let i = 1; i < events.length; i++) {
+    if (events[i - 1].at > events[i].at) {
+      ordered = [...events].sort((a, b) => a.at.localeCompare(b.at));
+      break;
+    }
+  }
+  for (const e of ordered) {
     if (e.type === 'checkout') open.set(e.tag, e);
     else if (e.type === 'checkin' && open.has(e.tag)) {
       const start = open.get(e.tag);

@@ -87,6 +87,9 @@ create table if not exists public.events (
 );
 create index if not exists events_tag_at_idx on public.events (tag, at desc);
 create index if not exists events_at_idx on public.events (at desc);
+-- empréstimos ativos (dashboard) e check-outs por período (relatórios/gráfico semanal)
+create index if not exists assets_in_use_idx on public.assets (assigned_since) where status = 'in_use';
+create index if not exists events_type_at_idx on public.events (type, at desc);
 
 -- ---------- Papéis ----------
 
@@ -333,28 +336,28 @@ drop policy if exists sectors_read on public.sectors;
 create policy sectors_read on public.sectors for select to authenticated using (true);
 drop policy if exists sectors_admin on public.sectors;
 create policy sectors_admin on public.sectors for all    to authenticated
-  using (public.app_role() = 'admin') with check (public.app_role() = 'admin');
+  using ((select public.app_role()) = 'admin') with check ((select public.app_role()) = 'admin');
 
 drop policy if exists profiles_read_self_or_admin on public.profiles;
 create policy profiles_read_self_or_admin on public.profiles for select to authenticated
-  using (id = auth.uid() or public.app_role() = 'admin');
+  using (id = (select auth.uid()) or (select public.app_role()) = 'admin');
 drop policy if exists profiles_admin_update on public.profiles;
 create policy profiles_admin_update on public.profiles for update to authenticated
-  using (public.app_role() = 'admin') with check (public.app_role() = 'admin');
+  using ((select public.app_role()) = 'admin') with check ((select public.app_role()) = 'admin');
 
 drop policy if exists assets_read on public.assets;
 create policy assets_read on public.assets for select to authenticated using (true);
 drop policy if exists assets_insert on public.assets;
 create policy assets_insert on public.assets for insert to authenticated
-  with check (public.app_role() in ('admin', 'tecnico'));
+  with check ((select public.app_role()) in ('admin', 'tecnico'));
 drop policy if exists assets_update on public.assets;
 create policy assets_update on public.assets for update to authenticated
-  using (public.app_role() in ('admin', 'tecnico')) with check (public.app_role() in ('admin', 'tecnico'));
+  using ((select public.app_role()) in ('admin', 'tecnico')) with check ((select public.app_role()) in ('admin', 'tecnico'));
 -- excluir: só admin, e só ativo sem movimentações reais (igual à regra do app)
 drop policy if exists assets_delete on public.assets;
 create policy assets_delete on public.assets for delete to authenticated
   using (
-    public.app_role() = 'admin'
+    (select public.app_role()) = 'admin'
     and status <> 'in_use'
     and not exists (
       select 1 from public.events e

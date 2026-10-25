@@ -38,7 +38,7 @@ export default function StatusDonut({ totals, total }) {
               {total}
             </text>
             <text x="70" y="84" textAnchor="middle" className="fill-slate-500 text-[9px]">
-              ativos
+              {total === 1 ? 'ativo' : 'ativos'}
             </text>
           </g>
         </svg>
@@ -51,7 +51,7 @@ export default function StatusDonut({ totals, total }) {
               </a>
               <span className="font-semibold text-slate-800">
                 {totals[s]}
-                <span className="ml-1 text-xs font-normal text-slate-400">
+                <span className="ml-1 text-xs font-normal text-slate-500">
                   ({total ? Math.round((totals[s] / total) * 100) : 0}%)
                 </span>
               </span>

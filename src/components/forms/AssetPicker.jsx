@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Field, inputClass } from '../ui/Field.jsx';
 import StatusBadge from '../ui/StatusBadge.jsx';
 import { normalizeTag } from '../../services/rules.js';
@@ -12,6 +13,12 @@ export function resolveAsset(assets, text) {
 
 // Campo de texto com lista de sugestões (datalist) — rápido de usar com teclado ou leitor de código de barras.
 export default function AssetPicker({ id, label, assets, value, onChange, error, hint, autoFocus, disabled }) {
+  // Foco automático só em telas largas e sem rolar a página: no celular ele abria o teclado
+  // e empurrava a tela para o formulário em vez de mostrar o início da página.
+  const ref = useRef(null);
+  useEffect(() => {
+    if (autoFocus && window.matchMedia?.('(min-width: 768px)').matches) ref.current?.focus({ preventScroll: true });
+  }, [autoFocus]);
   return (
     <Field label={label} htmlFor={id} error={error} hint={hint ?? 'Digite ou escaneie o código de patrimônio.'}>
       <input
@@ -22,7 +29,7 @@ export default function AssetPicker({ id, label, assets, value, onChange, error,
         list={`${id}-list`}
         placeholder="Ex.: RAD-0042"
         autoComplete="off"
-        autoFocus={autoFocus}
+        ref={ref}
         disabled={disabled}
       />
       <datalist id={`${id}-list`}>

@@ -1,59 +1,147 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { api as defaultApi } from '../services/index.js';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from './ToastContext.jsx';
 import { useAuth } from './AuthContext.jsx';
 import { can as canRole } from '../lib/permissions.js';
+import { computeStats } from '../services/stats.js';
+import {
+  EVENTS_WINDOW_DAYS,
+  applyChange,
+  lastEventId,
+  mergeEvents,
+  removeAsset,
+  setSectors,
+  upsertAsset,
+} from '../services/patch.js';
 
 export const DataContext = createContext(null);
 const EMPTY = { sectors: [], assets: [], events: [] };
 
-export function DataProvider({ children, api = defaultApi }) {
+// `api` é o adaptador de dados (local ou Supabase), escolhido em main.jsx.
+//
+// Desempenho: depois do carregamento inicial o app NÃO baixa mais tudo a cada ação.
+// Cada operação devolve o ativo alterado (aplicado direto no estado) e uma consulta
+// pequena traz só os eventos novos; o tempo real aplica apenas a linha que mudou.
+export function DataProvider({ children, api }) {
   const toast = useToast();
   const { role } = useAuth();
   const [data, setData] = useState(null);
   const [loadError, setLoadError] = useState(null);
+  const dataRef = useRef(null); // sempre o estado mais recente (útil dentro de callbacks assíncronos)
+  const statsCache = useRef({ data: null, stats: null });
 
+  const commit = useCallback((updater) => {
+    const next = updater(dataRef.current);
+    dataRef.current = next;
+    setData(next);
+  }, []);
+
+  // Recarga completa (só na abertura, em importações e quando o tempo real não sabe aplicar a mudança).
   const refresh = useCallback(async () => {
-    setData(await api.snapshot());
+    const snap = await api.snapshot({ recentDays: EVENTS_WINDOW_DAYS });
+    dataRef.current = snap;
+    setData(snap);
   }, [api]);
+
+  // Busca só os eventos criados depois do último que o app conhece.
+  const pullEvents = useCallback(async () => {
+    try {
+      const since = lastEventId(dataRef.current);
+      if (!since) return await refresh(); // sem eventos na janela: a recarga (limitada) é barata
+      const fresh = await api.eventsAfter(since);
+      commit((d) => mergeEvents(d, fresh));
+    } catch {
+      refresh().catch(() => {});
+    }
+  }, [api, commit, refresh]);
 
   useEffect(() => {
     refresh().catch((e) => setLoadError(e));
-    return api.subscribe?.(() => refresh().catch(() => {}));
-  }, [api, refresh]);
+    let timer;
+    const later = (fn) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn().catch(() => {}), 250);
+    };
+    const off = api.subscribe?.((change) => {
+      if (!dataRef.current) return;
+      const next = change ? applyChange(dataRef.current, change) : null;
+      if (next) {
+        dataRef.current = next;
+        setData(next);
+      } else if (change?.kind === 'sectors') {
+        later(async () => {
+          const sectors = await api.sectors();
+          commit((d) => setSectors(d, sectors));
+        });
+      } else {
+        later(refresh);
+      }
+    });
+    return () => {
+      clearTimeout(timer);
+      off?.();
+    };
+  }, [api, refresh, commit]);
 
   const actions = useMemo(() => {
-    // Executa a operação, recarrega os dados e (opcionalmente) avisa o usuário.
+    // Executa a operação, aplica o resultado no estado e (opcionalmente) avisa o usuário.
     // Erros sobem para o formulário, que mostra a mensagem junto aos campos.
-    const run = (fn, message) => async (...args) => {
+    const run = (fn, apply, message) => async (...args) => {
       const result = await fn(...args);
-      await refresh();
+      await apply?.(result, ...args);
       if (message) toast.success(typeof message === 'function' ? message(result, ...args) : message);
       return result;
     };
+    // Ativo devolvido pela operação entra no estado na hora; os eventos novos chegam logo depois.
+    const asset = (a) => {
+      commit((d) => upsertAsset(d, a));
+      pullEvents();
+    };
+    // A lista de setores é pequena: aplica o resultado local e confirma a ordem em segundo plano.
+    const syncSectors = () =>
+      api.sectors().then((s) => commit((d) => setSectors(d, s))).catch(() => {});
+    const reload = () => refresh();
+
     return {
-      createAsset: run((i) => api.createAsset(i), (a) => `Ativo ${a.tag} cadastrado.`),
-      updateAsset: run((t, p) => api.updateAsset(t, p), (a) => `Ativo ${a.tag} atualizado.`),
-      deleteAsset: run((t) => api.deleteAsset(t), (_, t) => `Ativo ${t} excluído.`),
-      checkOut: run((t, p) => api.checkOut(t, p), (a) => `Check-out de ${a.tag} registrado.`),
-      checkIn: run((t, p) => api.checkIn(t, p), (a) =>
+      createAsset: run((i) => api.createAsset(i), asset, (a) => `Ativo ${a.tag} cadastrado.`),
+      updateAsset: run((t, p) => api.updateAsset(t, p), asset, (a) => `Ativo ${a.tag} atualizado.`),
+      deleteAsset: run((t) => api.deleteAsset(t), (_, t) => commit((d) => removeAsset(d, t)), (_, t) => `Ativo ${t} excluído.`),
+      checkOut: run((t, p) => api.checkOut(t, p), asset, (a) => `Check-out de ${a.tag} registrado.`),
+      checkIn: run((t, p) => api.checkIn(t, p), asset, (a) =>
         a.status === 'maintenance' ? `${a.tag} devolvido e enviado para manutenção.` : `Check-in de ${a.tag} registrado.`
       ),
-      sendToMaintenance: run((t, p) => api.sendToMaintenance(t, p), (a) => `${a.tag} enviado para ${a.maintenance.kind === 'sterilization' ? 'esterilização' : 'manutenção'}.`),
-      completeMaintenance: run((t, p) => api.completeMaintenance(t, p), (a) => `${a.tag} liberado: disponível.`),
-      retire: run((t, p) => api.retire(t, p), (a) => `${a.tag} baixado.`),
-      createSector: run((n) => api.createSector(n), (s) => `Setor "${s.name}" criado.`),
-      deleteSector: run((id) => api.deleteSector(id), 'Setor excluído.'),
-      importData: run((d) => api.importData(d), 'Backup importado.'),
-      resetDemo: run(() => api.resetDemo(), 'Dados de demonstração restaurados.'),
-      clearAll: run(() => api.clearAll(), 'Todos os ativos foram apagados.'),
+      sendToMaintenance: run((t, p) => api.sendToMaintenance(t, p), asset, (a) => `${a.tag} enviado para ${a.maintenance.kind === 'sterilization' ? 'esterilização' : 'manutenção'}.`),
+      completeMaintenance: run((t, p) => api.completeMaintenance(t, p), asset, (a) => `${a.tag} liberado: disponível.`),
+      retire: run((t, p) => api.retire(t, p), asset, (a) => `${a.tag} baixado.`),
+      createSector: run(
+        (n) => api.createSector(n),
+        (s) => {
+          commit((d) => setSectors(d, [...d.sectors, s]));
+          syncSectors();
+        },
+        (s) => `Setor "${s.name}" criado.`
+      ),
+      deleteSector: run(
+        (id) => api.deleteSector(id),
+        (_, id) => commit((d) => setSectors(d, d.sectors.filter((s) => s.id !== id))),
+        'Setor excluído.'
+      ),
+      importData: run((d) => api.importData(d), reload, 'Backup importado.'),
+      resetDemo: run(() => api.resetDemo(), reload, 'Dados de demonstração restaurados.'),
+      clearAll: run(() => api.clearAll(), reload, 'Todos os ativos foram apagados.'),
       exportData: () => api.exportData(),
+      // Consultas sob demanda (o estado só guarda os eventos recentes)
+      eventsFor: (tag) => api.eventsFor(tag),
+      allEvents: () => api.allEvents(),
+      countEvents: () => api.countEvents(),
     };
-  }, [api, refresh, toast]);
+  }, [api, commit, pullEvents, refresh, toast]);
+
+  const can = useCallback((action) => canRole(role, action), [role]);
 
   const value = useMemo(() => {
     const d = data ?? EMPTY;
     const sectorMap = new Map(d.sectors.map((s) => [s.id, s.name]));
+    const assetMap = new Map(d.assets.map((a) => [a.tag, a]));
     return {
       data: d,
       actions,
@@ -61,11 +149,20 @@ export function DataProvider({ children, api = defaultApi }) {
       persistent: api.persistent,
       capabilities: api.capabilities ?? {},
       role,
-      can: (action) => canRole(role, action),
+      can,
       sectorName: (id) => sectorMap.get(id) ?? '—',
-      getAsset: (tag) => d.assets.find((a) => a.tag === tag) ?? null,
+      getAsset: (tag) => assetMap.get(tag) ?? null,
+      // Estatísticas calculadas uma única vez por versão dos dados e compartilhadas entre as páginas.
+      getStats: () => {
+        const c = statsCache.current;
+        if (c.data !== d) {
+          c.stats = computeStats({ assets: d.assets, events: d.events, sectors: d.sectors });
+          c.data = d;
+        }
+        return c.stats;
+      },
     };
-  }, [data, actions, api, role]);
+  }, [data, actions, api, role, can]);
 
   if (loadError) {
     return (

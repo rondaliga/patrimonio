@@ -22,6 +22,9 @@ export function fmtDuration(iso, now = new Date()) {
   return `${Math.round(h / 24)} d`;
 }
 
+// "1 setor" / "3 setores": concordância correta em contadores.
+export const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
 // Remove acentos (NFD + descarta marcas combinantes).
 export const stripAccents = (s) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 

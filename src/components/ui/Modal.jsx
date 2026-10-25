@@ -30,7 +30,7 @@ export default function Modal({ open, title, onClose, children, size = 'md' }) {
       >
         <div className="card-header">
           <h2 className="text-base font-semibold text-slate-800">{title}</h2>
-          <button onClick={onClose} aria-label="Fechar" className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+          <button onClick={onClose} aria-label="Fechar" className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-600">
             <X className="h-5 w-5" />
           </button>
         </div>

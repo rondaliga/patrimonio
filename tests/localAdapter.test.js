@@ -154,3 +154,52 @@ test('dados corrompidos no storage são substituídos pela demonstração', asyn
   const api = createLocalAdapter({ storage: createStorage('t', backend), now: () => NOW });
   assert.ok((await api.snapshot()).assets.length > 100);
 });
+
+test('consultas leves: janela de eventos, histórico por ativo e eventos novos', async () => {
+  const { api } = make();
+  const all = await api.snapshot();
+  const recent = await api.snapshot({ recentDays: 7 });
+  assert.ok(recent.events.length < all.events.length, 'janela reduz os eventos');
+  assert.equal(recent.assets.length, all.assets.length);
+
+  const lastId = Math.max(...all.events.map((e) => e.id));
+  await api.createAsset({ tag: 'MON-9100', name: 'Monitor', category: 'monitor', sectorId: 'uti' });
+  const fresh = await api.eventsAfter(lastId);
+  assert.deepEqual(fresh.map((e) => [e.tag, e.type]), [['MON-9100', 'created']]);
+
+  const hist = await api.eventsFor('MON-9100');
+  assert.equal(hist.length, 1);
+  assert.equal(await api.countEvents(), all.events.length + 1);
+  assert.equal((await api.allEvents()).length, all.events.length + 1);
+});
+
+test('snapshot devolve cópias: mudar o resultado não altera o armazenamento em memória', async () => {
+  const { api } = make();
+  const s = await api.snapshot();
+  const n = s.assets.length;
+  s.assets.pop();
+  s.events.length = 0;
+  const again = await api.snapshot();
+  assert.equal(again.assets.length, n);
+  assert.ok(again.events.length > 0);
+});
+
+test('cache em memória: erro de validação não deixa estado pela metade; outra aba invalida o cache', async () => {
+  const { api, backend } = make();
+  const before = await api.snapshot();
+  await assert.rejects(api.checkOut('NAO-EXISTE', { user: 'Ana', sectorId: 'uti' }), ValidationError);
+  assert.deepEqual(await api.snapshot(), before);
+
+  // simula outra aba gravando um backup diferente no mesmo armazenamento
+  const other = createLocalAdapter({ storage: createStorage('t', backend), now: () => NOW });
+  await other.createAsset({ tag: 'COL-9200', name: 'Coletor', category: 'collector', sectorId: 'ti' });
+  const listeners = {};
+  globalThis.window = { addEventListener: (n, f) => (listeners[n] = f), removeEventListener() {} };
+  let notified = 0;
+  const off = api.subscribe(() => notified++);
+  listeners.storage({ key: 't' });
+  off();
+  delete globalThis.window;
+  assert.equal(notified, 1);
+  assert.ok((await api.snapshot()).assets.some((a) => a.tag === 'COL-9200'));
+});

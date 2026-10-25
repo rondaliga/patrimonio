@@ -31,3 +31,10 @@ test('colunas de eventos geram CSV com descrição legível', () => {
 test('limite de empréstimo prolongado é único', () => {
   assert.equal(LONG_LOAN_HOURS, 12);
 });
+
+test('plural: concordância de contadores', async () => {
+  const { plural } = await import('../src/lib/format.js');
+  assert.equal(plural(0, 'setor', 'setores'), '0 setores');
+  assert.equal(plural(1, 'setor', 'setores'), '1 setor');
+  assert.equal(plural(6, 'ativo', 'ativos'), '6 ativos');
+});

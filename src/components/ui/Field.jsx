@@ -6,7 +6,7 @@ export function Field({ label, htmlFor, error, hint, children }) {
       {error ? (
         <p className="mt-1 text-xs text-red-600" role="alert">{error}</p>
       ) : hint ? (
-        <p className="mt-1 text-xs text-slate-400">{hint}</p>
+        <p className="mt-1 text-xs text-slate-500">{hint}</p>
       ) : null}
     </div>
   );

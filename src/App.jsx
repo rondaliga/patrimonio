@@ -1,16 +1,30 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import Sidebar from './components/layout/Sidebar.jsx';
 import Header from './components/layout/Header.jsx';
-import Dashboard from './pages/Dashboard.jsx';
-import AssetsPage from './pages/AssetsPage.jsx';
-import AssetDetailPage from './pages/AssetDetailPage.jsx';
-import SectorsPage from './pages/SectorsPage.jsx';
-import MovementPage from './pages/MovementPage.jsx';
-import MaintenancePage from './pages/MaintenancePage.jsx';
-import ReportsPage from './pages/ReportsPage.jsx';
-import SettingsPage from './pages/SettingsPage.jsx';
 import { useHashRoute } from './router/hashRouter.js';
+import { loaders, preloadAllWhenIdle } from './router/routes.js';
 import { useData } from './context/DataContext.jsx';
+
+// Cada página é um chunk separado, baixado só quando a rota é aberta (ou no tempo ocioso).
+const Dashboard = lazy(loaders.dashboard);
+const AssetsPage = lazy(loaders.assets);
+const AssetDetailPage = lazy(loaders.detail);
+const SectorsPage = lazy(loaders.sectors);
+const MovementPage = lazy(loaders.movement);
+const MaintenancePage = lazy(loaders.maintenance);
+const ReportsPage = lazy(loaders.reports);
+const SettingsPage = lazy(loaders.settings);
+
+function PageSkeleton() {
+  return (
+    <div className="space-y-4" aria-busy="true" aria-label="Carregando página">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => <div key={i} className="card h-24 animate-pulse bg-slate-50" />)}
+      </div>
+      <div className="card h-64 animate-pulse bg-slate-50" />
+    </div>
+  );
+}
 
 const TITLES = {
   '/': 'Dashboard',
@@ -60,6 +74,8 @@ export default function App() {
   const { data } = useData();
   const [menuOpen, setMenuOpen] = useState(false);
 
+  useEffect(() => preloadAllWhenIdle(), []);
+
   // Ao trocar de página: fecha o menu mobile e volta ao topo.
   useEffect(() => {
     setMenuOpen(false);
@@ -67,14 +83,19 @@ export default function App() {
   }, [path]);
 
   const { title, element } = resolve(path, query);
-  const counts = { maintenance: data.assets.filter((a) => a.status === 'maintenance').length };
+  const counts = useMemo(
+    () => ({ maintenance: data.assets.filter((a) => a.status === 'maintenance').length }),
+    [data.assets]
+  );
 
   return (
     <div className="flex min-h-screen">
       <Sidebar path={path} open={menuOpen} onClose={() => setMenuOpen(false)} counts={counts} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Header title={title} onMenu={() => setMenuOpen(true)} searchValue={path === '/ativos' ? query.q : ''} />
-        <main className="flex-1 p-4 sm:p-6">{element}</main>
+        <Header title={title} onMenu={() => setMenuOpen(true)} hideSearch={path === '/ativos'} />
+        <main className="flex-1 p-4 sm:p-6">
+          <Suspense fallback={<PageSkeleton />}>{element}</Suspense>
+        </main>
       </div>
     </div>
   );

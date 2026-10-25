@@ -26,7 +26,7 @@ export default function WeeklyLoansChart({ data, className = '' }) {
                   style={{ height: `${pct}%` }}
                 />
               </div>
-              <span className={`text-[11px] ${isToday ? 'font-semibold text-brand-700' : 'text-slate-400'}`}>
+              <span className={`text-[11px] ${isToday ? 'font-semibold text-brand-700' : 'text-slate-500'}`}>
                 {d.day}
               </span>
             </div>

@@ -34,7 +34,7 @@ export default function SectorBarChart({ data, className = '' }) {
                 className="flex h-5 overflow-hidden rounded bg-slate-100"
                 style={{ width: `${(total / max) * 100}%`, minWidth: '2rem' }}
                 role="img"
-                aria-label={`${sector}: ${total} ativos`}
+                aria-label={`${sector}: ${total} ${total === 1 ? 'ativo' : 'ativos'}`}
               >
                 {STATUS_ORDER.map((s) =>
                   byStatus[s] > 0 ? (

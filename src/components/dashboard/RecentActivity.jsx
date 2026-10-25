@@ -37,7 +37,7 @@ export default function RecentActivity({ items }) {
                     </a>{' '}
                     {text}
                   </p>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500">
                     {sector ? `${sector} · ` : ''}
                     {fmtDateTime(at)}
                   </p>

@@ -80,17 +80,19 @@ backup** com frequência. Para uso compartilhado entre a equipe, siga a Fase 2.
 .github/workflows/       deploy.yml: testa, compila e publica no GitHub Pages a cada upload
 scripts/                 backup-to-sql.mjs: migra o backup JSON da Fase 1 para o Supabase
 .env.example             variáveis do Supabase para uso local (copie para .env.local)
+public/sw.js             service worker (cache das visitas seguintes)
 supabase/                Fase 2: schema.sql (arquivo único e repetível) + testes e mock locais
 tests/                   testes automatizados (node --test)
 src/
-├─ services/             camada de dados — única parte que muda ao trocar de backend
+├─ services/             camada de dados — única parte que muda ao trocar de backend (carregada sob demanda)
 │  ├─ rules.js           regras puras: ciclo de vida, validações, texto do histórico
 │  ├─ localAdapter.js    API de dados sobre localStorage
 │  ├─ supabaseAdapter.js API de dados sobre o Supabase (mesmos métodos) + autenticação
 │  ├─ supabaseMapping.js linhas do banco ⇄ objetos do app; tradução de erros
-│  ├─ storage.js · seed.js · stats.js · index.js
+│  ├─ patch.js           atualizações incrementais do estado (ativo, eventos, tempo real)
+│  ├─ storage.js · seed.js · stats.js · index.js (loadApi)
 ├─ context/              AuthContext (login/papel), DataContext (dados + ações) e ToastContext
-├─ router/               roteador por hash (#/ativos/RAD-0042)
+├─ router/               roteador por hash (#/ativos/RAD-0042) e carregamento das páginas (routes.js)
 ├─ pages/                Dashboard, Ativos, Detalhe, Setores, Check-in/out, Manutenção, Relatórios, Config
 ├─ components/           layout, dashboard, forms, ui
 ├─ lib/                  status, formatação, CSV (+ colunas), permissões, download

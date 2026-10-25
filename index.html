@@ -8,14 +8,33 @@
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2317718f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7Z'/%3E%3C/svg%3E"
     />
+    <!-- Fonte carregada sem bloquear a primeira pintura (a página usa a fonte do sistema até ela chegar) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      media="print"
+      onload="this.media='all'"
     />
+    <noscript>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+    </noscript>
+    <style>
+      /* Casca exibida instantaneamente, antes de o JavaScript chegar */
+      body { margin: 0; font-family: system-ui, sans-serif; }
+      #boot { display: flex; min-height: 100vh; }
+      #boot .side { width: 16rem; background: #fff; border-right: 1px solid #e2e8f0; }
+      #boot .main { flex: 1; padding: 1.5rem; }
+      #boot .bar { height: 2.5rem; background: #e2e8f0; border-radius: 6px; margin-bottom: 1.5rem; max-width: 18rem; }
+      #boot .blk { height: 6rem; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 1rem; animation: bootpulse 1.4s ease-in-out infinite; }
+      @keyframes bootpulse { 50% { opacity: .55; } }
+      @media (max-width: 767px) { #boot .side { display: none; } }
+    </style>
   </head>
   <body class="bg-slate-100 text-slate-800">
     <div id="root">
+      <div id="boot" aria-hidden="true"><div class="side"></div><div class="main"><div class="bar"></div><div class="blk"></div><div class="blk"></div></div></div>
       <!-- Aviso exibido só se o JavaScript do app não carregar -->
       <div id="fallback" style="display:none;padding:24px;font-family:system-ui,sans-serif;max-width:640px">
         <h1 style="font-size:18px;font-weight:600">Não foi possível carregar a aplicação</h1>
@@ -31,6 +50,8 @@
           // ainda existe, o app não subiu.
           var f = document.getElementById('fallback');
           if (!f) return;
+          var boot = document.getElementById('boot');
+          if (boot) boot.style.display = 'none';
           document.getElementById('fallback-msg').textContent = msg;
           f.style.display = 'block';
         }

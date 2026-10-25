@@ -34,19 +34,28 @@ export default function AssetsPage({ query }) {
 
   const setFilter = (key, value) => navigate(`/ativos${buildQuery({ ...filters, [key]: value })}`, { replace: true });
 
+  // Índice de busca: o texto normalizado (sem acento/caixa) de cada ativo é calculado uma vez
+  // por versão dos dados, e não a cada tecla digitada. A ordenação também.
+  const index = useMemo(
+    () =>
+      [...data.assets]
+        .sort((a, b) => a.tag.localeCompare(b.tag))
+        .map((a) => ({ a, hay: fold(`${a.tag} ${a.name} ${a.serial} ${a.assignedTo?.user ?? ''}`) })),
+    [data.assets]
+  );
+
   const rows = useMemo(() => {
     const needle = fold(filters.q.trim());
-    return data.assets
-      .filter((a) => {
-        if (filters.status && a.status !== filters.status) return false;
-        if (filters.setor && a.sectorId !== filters.setor) return false;
-        if (filters.categoria && a.category !== filters.categoria) return false;
-        if (!needle) return true;
-        const hay = fold(`${a.tag} ${a.name} ${a.serial} ${a.assignedTo?.user ?? ''}`);
-        return hay.includes(needle);
-      })
-      .sort((a, b) => a.tag.localeCompare(b.tag));
-  }, [data.assets, filters.q, filters.status, filters.setor, filters.categoria]);
+    const out = [];
+    for (const { a, hay } of index) {
+      if (filters.status && a.status !== filters.status) continue;
+      if (filters.setor && a.sectorId !== filters.setor) continue;
+      if (filters.categoria && a.category !== filters.categoria) continue;
+      if (needle && !hay.includes(needle)) continue;
+      out.push(a);
+    }
+    return out;
+  }, [index, filters.q, filters.status, filters.setor, filters.categoria]);
 
   const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const current = Math.min(page, pages);
@@ -134,7 +143,7 @@ export default function AssetsPage({ query }) {
                     </td>
                     <td>
                       {a.name}
-                      <span className="block text-[11px] text-slate-400">{CATEGORIES[a.category]}</span>
+                      <span className="block text-[11px] text-slate-500">{CATEGORIES[a.category]}</span>
                       <span className="block text-[11px] text-slate-500 md:hidden">
                         {a.assignedTo ? `${a.assignedTo.user} · ${sectorName(a.assignedTo.sectorId)}` : sectorName(a.sectorId)}
                       </span>
@@ -145,7 +154,7 @@ export default function AssetsPage({ query }) {
                       {a.assignedTo ? (
                         <>
                           {a.assignedTo.user}
-                          <span className="block text-[11px] text-slate-400">{sectorName(a.assignedTo.sectorId)}</span>
+                          <span className="block text-[11px] text-slate-500">{sectorName(a.assignedTo.sectorId)}</span>
                         </>
                       ) : (
                         <span className="text-slate-500">{sectorName(a.sectorId)}</span>

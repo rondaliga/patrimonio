@@ -1,15 +1,15 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { useData } from '../context/DataContext.jsx';
 import ConfirmModal from '../components/ui/ConfirmModal.jsx';
 import { Field, inputClass } from '../components/ui/Field.jsx';
-import { computeStats } from '../services/stats.js';
 import { STATUS, STATUS_ORDER } from '../lib/status.js';
+import { plural } from '../lib/format.js';
 
 export default function SectorsPage() {
-  const { data, actions, can } = useData();
+  const { data, actions, can, getStats } = useData();
   const canManage = can('sector.manage');
-  const stats = useMemo(() => computeStats({ assets: data.assets, events: data.events, sectors: data.sectors }), [data]);
+  const stats = getStats();
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -34,7 +34,7 @@ export default function SectorsPage() {
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">Setores e alas</h2>
-          <span className="text-xs text-slate-400">{data.sectors.length} setores</span>
+          <span className="text-xs text-slate-500">{plural(data.sectors.length, 'setor', 'setores')}</span>
         </div>
         <div className="overflow-x-auto">
           <table className="table-dense w-full">

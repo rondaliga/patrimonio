@@ -15,6 +15,8 @@ function fakeClient({ tables = {}, rpcs = {}, errors = {} } = {}) {
       update: (v) => ((state.op = 'update'), (state.values = v), b),
       delete: () => ((state.op = 'delete'), b),
       eq: (k, v) => (state.filters.push([k, v]), b),
+      gt: (k, v) => (state.filters.push(['gt:' + k, v]), b),
+      gte: (k, v) => (state.filters.push(['gte:' + k, v]), b),
       order: () => b,
       range: (a, z) => ((state.range = [a, z]), b),
       single: () => ((state.single = true), b),
@@ -88,9 +90,14 @@ test('erro de RPC chega ao formulário como ValidationError com campo', async ()
 });
 
 test('createAsset valida antes de enviar e traduz duplicidade', async () => {
-  const tables = { sectors: [{ id: 'uti' }], assets: [{ tag: 'RAD-0001' }] };
-  const api = createSupabaseAdapter(fakeClient({ tables }));
-  await assert.rejects(api.createAsset({ tag: 'rad-0001', name: 'X', category: 'radio', sectorId: 'uti' }), (e) => !!e.fields.tag);
+  // Duplicidade: não baixa mais todas as tags; o banco recusa (chave primária) e o erro é traduzido.
+  const dupClient = fakeClient({
+    tables: { sectors: [{ id: 'uti' }] },
+    errors: { 'assets.insert': { code: '23505', message: 'duplicate key value violates unique constraint "assets_pkey"' } },
+  });
+  const api = createSupabaseAdapter(dupClient);
+  await assert.rejects(api.createAsset({ tag: 'rad-0001', name: 'Rádio', category: 'radio', sectorId: 'uti' }), (e) => !!e.fields.tag);
+  assert.ok(!dupClient.calls.some((c) => c.table === 'assets' && c.op === 'select'), 'não deve ler a tabela de ativos inteira');
   await assert.rejects(api.createAsset({ tag: 'RAD-0002', name: '', category: 'radio', sectorId: 'uti' }), (e) => !!e.fields.name);
   const ok = fakeClient({ tables: { sectors: [{ id: 'uti' }], assets: (s) => (s.op === 'insert' ? row({ tag: 'RAD-0002' }) : []) } });
   const created = await createSupabaseAdapter(ok).createAsset({ tag: 'rad-0002', name: 'Rádio', category: 'radio', sectorId: 'uti' });
@@ -117,4 +124,39 @@ test('operações em massa não existem no modo online', async () => {
   assert.equal(api.capabilities.demo, false);
   assert.throws(() => api.resetDemo(), ValidationError);
   assert.throws(() => api.importData({}), ValidationError);
+});
+
+test('snapshot com recentDays filtra eventos no servidor e escolhe só colunas necessárias', async () => {
+  const NOW = new Date('2026-10-20T12:00:00Z');
+  const client = fakeClient({ tables: { sectors: [{ id: 'uti', name: 'UTI' }], assets: [row()], events: [] } });
+  await createSupabaseAdapter(client, { now: () => NOW }).snapshot({ recentDays: 60 });
+  const ev = client.calls.find((c) => c.table === 'events');
+  assert.deepEqual(ev.filters, [['gte:at', '2026-08-21T12:00:00.000Z']]);
+});
+
+test('eventsAfter pede só eventos com id maior; eventsFor filtra por patrimônio', async () => {
+  const client = fakeClient({ tables: { events: [{ id: 5, tag: 'A', type: 'checkout', at: '2026-10-20T10:00:00Z' }] } });
+  const api = createSupabaseAdapter(client);
+  const after = await api.eventsAfter(4);
+  assert.equal(after[0].id, 5);
+  assert.deepEqual(client.calls.at(-1).filters, [['gt:id', 4]]);
+  await api.eventsFor('A');
+  assert.deepEqual(client.calls.at(-1).filters, [['tag', 'A']]);
+});
+
+test('tempo real: mudanças chegam descritas (ativo, evento, setor)', () => {
+  const handlers = [];
+  const ch = { on: (_t, filter, fn) => (handlers.push([filter.table, fn]), ch), subscribe: () => ch };
+  const client = { channel: () => ch, removeChannel() {} };
+  const got = [];
+  createSupabaseAdapter(client).subscribe((c) => got.push(c));
+  const fire = (table, payload) => handlers.find(([t]) => t === table)[1](payload);
+  fire('assets', { eventType: 'UPDATE', new: row({ status: 'maintenance', maint_kind: 'maintenance', maint_reason: 'x', maint_since: '2026-10-20T10:00:00Z' }) });
+  fire('assets', { eventType: 'DELETE', old: { tag: 'RAD-0001' } });
+  fire('events', { eventType: 'INSERT', new: { id: 9, tag: 'A', type: 'edited', at: '2026-10-20T10:00:00Z' } });
+  fire('events', { eventType: 'DELETE', old: { id: 9 } });
+  fire('sectors', { eventType: 'INSERT' });
+  assert.deepEqual(got.map((c) => c.kind), ['asset', 'asset-removed', 'event', 'sectors']);
+  assert.equal(got[0].asset.status, 'maintenance');
+  assert.equal(got[1].tag, 'RAD-0001');
 });

@@ -74,7 +74,7 @@ export default function MovementPage({ query }) {
                     </td>
                     <td>
                       {getAsset(e.tag)?.name ?? '—'}
-                      <span className="block text-[11px] text-slate-400 md:hidden">{describeEvent(e, e.sectorId ? sectorName(e.sectorId) : '')}</span>
+                      <span className="block text-[11px] text-slate-500 md:hidden">{describeEvent(e, e.sectorId ? sectorName(e.sectorId) : '')}</span>
                     </td>
                     <td className="hidden md:table-cell">{describeEvent(e, e.sectorId ? sectorName(e.sectorId) : '')}</td>
                   </tr>

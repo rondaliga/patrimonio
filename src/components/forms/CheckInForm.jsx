@@ -56,7 +56,6 @@ export default function CheckInForm({ initialTag = '', lockAsset = false, onDone
         value={tag}
         onChange={setTag}
         error={tagError}
-        autoFocus={!lockAsset}
         disabled={lockAsset}
       />
       <AssetSummary asset={found} />

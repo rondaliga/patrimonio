@@ -20,7 +20,7 @@ export default function ActiveLoansTable({ loans }) {
                 <th>Patrimônio</th>
                 <th>Ativo</th>
                 <th className="hidden md:table-cell">Responsável</th>
-                <th className="hidden md:table-cell">Setor destino</th>
+                <th className="hidden md:table-cell">Setor de destino</th>
                 <th>Desde</th>
                 <th />
               </tr>
@@ -37,14 +37,14 @@ export default function ActiveLoansTable({ loans }) {
                     </td>
                     <td>
                       {l.asset}
-                      <span className="block text-[11px] text-slate-400">{CATEGORIES[l.category]}</span>
+                      <span className="block text-[11px] text-slate-500">{CATEGORIES[l.category]}</span>
                       <span className="block text-[11px] text-slate-500 md:hidden">{l.user} · {l.sector}</span>
                     </td>
                     <td className="hidden md:table-cell">{l.user}</td>
                     <td className="hidden md:table-cell">{l.sector}</td>
                     <td className="whitespace-nowrap text-slate-500">
                       <span className="hidden md:inline">{fmtDateTime(l.since)}</span>
-                      <span className={`block text-[11px] ${long ? 'font-medium text-amber-600' : 'text-slate-400'}`}>
+                      <span className={`block text-[11px] ${long ? 'font-medium text-amber-600' : 'text-slate-500'}`}>
                         há {fmtDuration(l.since)}
                       </span>
                     </td>

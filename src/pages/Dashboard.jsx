@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { Boxes, BadgeCheck, ArrowLeftRight, Wrench, Radio, Accessibility } from 'lucide-react';
 import MetricCard from '../components/dashboard/MetricCard.jsx';
 import SectorBarChart from '../components/dashboard/SectorBarChart.jsx';
@@ -7,15 +6,11 @@ import WeeklyLoansChart from '../components/dashboard/WeeklyLoansChart.jsx';
 import ActiveLoansTable from '../components/dashboard/ActiveLoansTable.jsx';
 import RecentActivity from '../components/dashboard/RecentActivity.jsx';
 import { useData } from '../context/DataContext.jsx';
-import { computeStats } from '../services/stats.js';
 import { describeEvent } from '../services/rules.js';
 
 export default function Dashboard() {
-  const { data, actions, sectorName, can, capabilities } = useData();
-  const stats = useMemo(
-    () => computeStats({ assets: data.assets, events: data.events, sectors: data.sectors }),
-    [data]
-  );
+  const { data, actions, sectorName, can, capabilities, getStats } = useData();
+  const stats = getStats(); // calculado uma vez por versão dos dados (compartilhado com outras páginas)
 
   if (data.assets.length === 0) {
     return (
@@ -50,7 +45,7 @@ export default function Dashboard() {
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Total de ativos" value={stats.total} hint="em todos os setores" icon={Boxes} tone="slate" href="#/ativos" />
         <MetricCard label="Disponíveis" value={st.available} hint="prontos para check-out" icon={BadgeCheck} tone="green" href="#/ativos?status=available" />
-        <MetricCard label="Em uso" value={st.in_use} hint={`${stats.activeLoans.length} emprestados agora`} icon={ArrowLeftRight} tone="blue" href="#/ativos?status=in_use" />
+        <MetricCard label="Em uso" value={st.in_use} hint={`${stats.activeLoans.length} ${stats.activeLoans.length === 1 ? 'emprestado' : 'emprestados'} agora`} icon={ArrowLeftRight} tone="blue" href="#/ativos?status=in_use" />
         <MetricCard label="Manutenção / Esterilização" value={st.maintenance} hint={`${st.retired} baixados`} icon={Wrench} tone="amber" href="#/manutencao" />
       </section>
 

@@ -9,7 +9,7 @@ no GitHub Pages. **O código já está pronto**: `supabaseAdapter.js`, tela de l
   tabelas `sectors`, `assets`, `events`, `profiles`; estado coerente garantido por CHECK; histórico
   imutável; movimentações atômicas por RPC; RLS com permissões mínimas; tempo real habilitado se disponível.
 - `src/services/supabaseAdapter.js`: mesma API do adaptador local, mais `auth` (login/sessão/perfil).
-  Lê tudo em páginas de 1000 linhas, traduz erros do banco em mensagens por campo e assina o tempo real.
+  Lê ativos e os eventos dos últimos 60 dias em páginas de 1000 linhas (o histórico completo de cada ativo e a exportação são buscados sob demanda), traduz erros do banco em mensagens por campo e assina o tempo real (aplicando só a linha que mudou).
 - `src/context/AuthContext.jsx`: exige login quando o Supabase está configurado e carrega o papel.
 - `src/lib/permissions.js`: esconde na interface o que o papel não pode fazer (o banco bloqueia de qualquer forma).
 - `scripts/backup-to-sql.mjs`: migra o backup da Fase 1 para o banco.

@@ -2,7 +2,7 @@
 // Recebe o `client` do supabase-js (injetado, para poder ser testado com um falso).
 import { ValidationError, normalizeAssetInput } from './rules.js';
 import { slugify } from '../lib/format.js';
-import { assetToInsert, rowToAsset, rowToEvent, toValidationError } from './supabaseMapping.js';
+import { ASSET_COLUMNS, EVENT_COLUMNS, assetToInsert, rowToAsset, rowToEvent, toValidationError } from './supabaseMapping.js';
 
 const DB_VERSION = 1;
 const PAGE = 1000; // limite padrão do PostgREST por requisição
@@ -15,27 +15,32 @@ export function createSupabaseAdapter(client, { now = () => new Date() } = {}) {
     return data;
   }
 
-  // Lê todas as linhas, em páginas (eventos podem passar de 1000).
-  async function fetchAll(table, orderBy) {
+  // Lê todas as linhas, em páginas (o PostgREST devolve no máximo 1000 por requisição).
+  // `build` recebe a consulta (já com select) e acrescenta filtros; a ordenação vem depois.
+  async function fetchAll(table, columns, orderBy, build = (q) => q) {
     const rows = [];
     for (let from = 0; ; from += PAGE) {
-      const part = await run(client.from(table).select('*').order(orderBy).range(from, from + PAGE - 1));
+      const query = build(client.from(table).select(columns));
+      const part = await run(query.order(orderBy).range(from, from + PAGE - 1));
       rows.push(...part);
       if (part.length < PAGE) return rows;
     }
   }
 
-  async function snapshot() {
+  const fetchSectors = async () =>
+    (await fetchAll('sectors', 'id,name', 'name')).map((s) => ({ id: s.id, name: s.name }));
+
+  // `recentDays`: carrega só os eventos desse período — o histórico completo de um ativo
+  // sai por eventsFor() e o de exportação por allEvents(). A tabela de eventos só cresce,
+  // então este é o ganho principal de carregamento.
+  async function snapshot({ recentDays } = {}) {
+    const since = recentDays ? new Date(new Date(now()).getTime() - recentDays * 86400000).toISOString() : null;
     const [sectors, assets, events] = await Promise.all([
-      fetchAll('sectors', 'name'),
-      fetchAll('assets', 'tag'),
-      fetchAll('events', 'id'),
+      fetchSectors(),
+      fetchAll('assets', ASSET_COLUMNS, 'tag'),
+      fetchAll('events', EVENT_COLUMNS, 'id', since ? (q) => q.gte('at', since) : undefined),
     ]);
-    return {
-      sectors: sectors.map((s) => ({ id: s.id, name: s.name })),
-      assets: assets.map(rowToAsset),
-      events: events.map(rowToEvent),
-    };
+    return { sectors, assets: assets.map(rowToAsset), events: events.map(rowToEvent) };
   }
 
   const rpc = async (fn, args) => rowToAsset(await run(client.rpc(fn, args)));
@@ -45,7 +50,6 @@ export function createSupabaseAdapter(client, { now = () => new Date() } = {}) {
     throw new ValidationError('Esta operação não está disponível no modo online. Use o painel do Supabase.');
   };
 
-  let timer = null;
   return {
     mode: 'supabase',
     persistent: true,
@@ -55,15 +59,10 @@ export function createSupabaseAdapter(client, { now = () => new Date() } = {}) {
 
     // ---- Ativos ----
     async createAsset(input) {
-      const [sectors, tags] = await Promise.all([
-        run(client.from('sectors').select('id')),
-        run(client.from('assets').select('tag')),
-      ]);
-      const value = normalizeAssetInput(input, {
-        sectors,
-        assets: tags,
-        isNew: true,
-      });
+      // Só os setores (poucos) são consultados. Patrimônio repetido é recusado pelo próprio banco
+      // (chave primária) e traduzido para o campo do formulário — não precisa baixar todas as tags.
+      const sectors = await run(client.from('sectors').select('id'));
+      const value = normalizeAssetInput(input, { sectors, assets: [], isNew: true });
       return rowToAsset(await run(client.from('assets').insert(assetToInsert(value)).select().single()));
     },
 
@@ -92,6 +91,30 @@ export function createSupabaseAdapter(client, { now = () => new Date() } = {}) {
     completeMaintenance: (tag, p = {}) => rpc('complete_maintenance', { p_tag: tag, p_note: text(p.note) }),
     retire: (tag, p) => rpc('retire_asset', { p_tag: tag, p_reason: text(p.reason) }),
 
+    // ---- Consultas leves (evitam recarregar tudo) ----
+    sectors: fetchSectors,
+
+    // Histórico completo de um ativo (mais recente primeiro).
+    async eventsFor(tag) {
+      const rows = await fetchAll('events', EVENT_COLUMNS, 'id', (q) => q.eq('tag', tag));
+      return rows.map(rowToEvent).sort((a, b) => b.at.localeCompare(a.at));
+    },
+
+    // Só os eventos novos depois de `id` (1 consulta pequena após cada ação).
+    async eventsAfter(id) {
+      return (await fetchAll('events', EVENT_COLUMNS, 'id', (q) => q.gt('id', id))).map(rowToEvent);
+    },
+
+    async allEvents() {
+      return (await fetchAll('events', EVENT_COLUMNS, 'id')).map(rowToEvent);
+    },
+
+    async countEvents() {
+      const { count, error } = await client.from('events').select('id', { count: 'exact', head: true });
+      if (error) throw toValidationError(error);
+      return count ?? 0;
+    },
+
     // ---- Setores ----
     async createSector(name) {
       const clean = text(name).trim().replace(/\s+/g, ' ');
@@ -118,22 +141,22 @@ export function createSupabaseAdapter(client, { now = () => new Date() } = {}) {
     resetDemo: unavailable,
     clearAll: unavailable,
 
-    // Tempo real (requer a publicação habilitada — veja o fim do schema.sql)
+    // Tempo real (requer a publicação habilitada — veja o fim do schema.sql).
+    // Cada mudança chega já descrita ({ kind: 'asset' | 'asset-removed' | 'event' }) e o app
+    // aplica só ela; mudanças de setor chegam sem detalhes e o app recarrega os setores.
     subscribe(cb) {
-      const fire = () => {
-        clearTimeout(timer);
-        timer = setTimeout(cb, 250);
+      const onAsset = (p) =>
+        cb(p.eventType === 'DELETE' ? { kind: 'asset-removed', tag: p.old?.tag } : { kind: 'asset', asset: rowToAsset(p.new) });
+      const onEvent = (p) => {
+        if (p.eventType === 'INSERT') cb({ kind: 'event', event: rowToEvent(p.new) });
       };
       const ch = client
         .channel('patrimonio-changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'assets' }, fire)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, fire)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'sectors' }, fire)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'assets' }, onAsset)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, onEvent)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'sectors' }, () => cb({ kind: 'sectors' }))
         .subscribe();
-      return () => {
-        clearTimeout(timer);
-        client.removeChannel(ch);
-      };
+      return () => client.removeChannel(ch);
     },
 
     // ---- Autenticação ----

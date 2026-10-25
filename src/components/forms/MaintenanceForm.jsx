@@ -57,7 +57,6 @@ export default function MaintenanceForm({ initialTag = '', lockAsset = false, on
         value={tag}
         onChange={setTag}
         error={tagError}
-        autoFocus={!lockAsset}
         disabled={lockAsset}
       />
       <AssetSummary asset={found} />

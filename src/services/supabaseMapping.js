@@ -2,6 +2,11 @@
 // e tradução de erros do PostgreSQL/Supabase em ValidationError. Funções puras.
 import { ValidationError } from './rules.js';
 
+// Colunas lidas do banco (menos tráfego que select('*'): ex.: a coluna `actor` do histórico não é usada).
+export const ASSET_COLUMNS =
+  'tag,name,category,serial,sector_id,notes,status,assigned_user,assigned_sector_id,assigned_since,assigned_note,maint_kind,maint_reason,maint_since,retired_reason,retired_at,created_at';
+export const EVENT_COLUMNS = 'id,tag,type,at,user_name,sector_id,kind,condition,reason,note';
+
 const iso = (v) => (v ? new Date(v).toISOString() : null);
 
 export function rowToAsset(r) {

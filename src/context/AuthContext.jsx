@@ -1,23 +1,33 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { HeartPulse } from 'lucide-react';
-import { api as defaultApi } from '../services/index.js';
 import { Field, FormError, inputClass } from '../components/ui/Field.jsx';
 
 const AuthContext = createContext({ user: null, role: 'admin', fullName: '', signOut: null });
 
 // Sem `api.auth` (modo local) o app abre direto, com todas as permissões.
 // Com `api.auth` (Supabase) exige login e carrega o papel do usuário.
-export function AuthProvider({ children, api = defaultApi }) {
+export function AuthProvider({ children, api }) {
   const auth = api.auth;
   const [state, setState] = useState(auth ? { loading: true, session: null, profile: null, error: '' } : null);
 
+  // Usuário cujo perfil já foi pedido (ou está sendo). O Supabase avisa mudanças de sessão
+  // também ao renovar o token e ao voltar para a aba, e a abertura dispara getSession + INITIAL_SESSION:
+  // sem este controle o perfil seria buscado de novo (e a tela redesenhada) sem necessidade.
+  const loadedUser = useRef(null);
+
   const load = useCallback(
     async (session) => {
-      if (!session) return setState({ loading: false, session: null, profile: null, error: '' });
+      if (!session) {
+        loadedUser.current = null;
+        return setState({ loading: false, session: null, profile: null, error: '' });
+      }
+      if (loadedUser.current === session.user.id) return;
+      loadedUser.current = session.user.id;
       try {
         const profile = await auth.getProfile(session.user.id);
         setState({ loading: false, session, profile, error: '' });
       } catch (e) {
+        loadedUser.current = null;
         setState({ loading: false, session: null, profile: null, error: e.message });
         auth.signOut().catch(() => {});
       }
@@ -89,7 +99,7 @@ function LoginScreen({ auth, initialError }) {
         </Field>
         <FormError message={error} />
         <button type="submit" className="btn btn-primary w-full" disabled={busy}>Entrar</button>
-        <p className="text-xs text-slate-400">Contas são criadas pelo administrador do sistema.</p>
+        <p className="text-xs text-slate-500">Contas são criadas pelo administrador do sistema.</p>
       </form>
     </div>
   );

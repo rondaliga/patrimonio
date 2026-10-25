@@ -1,9 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Download, Clock, LogOut, TriangleAlert } from 'lucide-react';
 import { useData } from '../context/DataContext.jsx';
 import MetricCard from '../components/dashboard/MetricCard.jsx';
 import EmptyState from '../components/ui/EmptyState.jsx';
-import { computeStats, loanDurations } from '../services/stats.js';
+import { loanDurations } from '../services/stats.js';
 import { describeEvent } from '../services/rules.js';
 import { LONG_LOAN_HOURS } from '../lib/status.js';
 import { assetColumns, eventColumns } from '../lib/exports.js';
@@ -14,7 +14,8 @@ import { downloadFile } from '../lib/download.js';
 const DAYS = 30;
 
 export default function ReportsPage() {
-  const { data, sectorName, getAsset } = useData();
+  const { data, sectorName, getAsset, getStats, actions } = useData();
+  const [exporting, setExporting] = useState(false);
 
   const r = useMemo(() => {
     const since = Date.now() - DAYS * 86400000;
@@ -24,7 +25,7 @@ export default function ReportsPage() {
     const avg = durations.length ? durations.reduce((a, d) => a + d.hours, 0) / durations.length : null;
     const bySector = new Map();
     for (const e of checkouts) bySector.set(e.sectorId, (bySector.get(e.sectorId) || 0) + 1);
-    const stats = computeStats({ assets: data.assets, events: data.events, sectors: data.sectors });
+    const stats = getStats();
     return {
       checkouts: checkouts.length,
       avg,
@@ -36,12 +37,20 @@ export default function ReportsPage() {
   const exportAssets = () =>
     downloadFile('ativos.csv', toCsv(data.assets, assetColumns(sectorName, { withCreatedAt: true })), 'text/csv;charset=utf-8');
 
-  const exportEvents = () =>
-    downloadFile(
-      'movimentacoes.csv',
-      toCsv([...data.events].sort((a, b) => b.at.localeCompare(a.at)), eventColumns({ sectorName, getAsset, describeEvent })),
-      'text/csv;charset=utf-8'
-    );
+  // O estado guarda só os eventos recentes; a exportação busca o histórico completo na hora.
+  const exportEvents = async () => {
+    setExporting(true);
+    try {
+      const all = await actions.allEvents();
+      downloadFile(
+        'movimentacoes.csv',
+        toCsv([...all].sort((a, b) => b.at.localeCompare(a.at)), eventColumns({ sectorName, getAsset, describeEvent })),
+        'text/csv;charset=utf-8'
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -117,11 +126,11 @@ export default function ReportsPage() {
           <button className="btn btn-secondary" onClick={exportAssets} disabled={!data.assets.length}>
             <Download className="h-4 w-4" /> Ativos (CSV)
           </button>
-          <button className="btn btn-secondary" onClick={exportEvents} disabled={!data.events.length}>
+          <button className="btn btn-secondary" onClick={exportEvents} disabled={exporting}>
             <Download className="h-4 w-4" /> Movimentações (CSV)
           </button>
         </div>
-        <p className="mt-2 text-xs text-slate-400">Formato CSV com separador “;”, pronto para abrir no Excel.</p>
+        <p className="mt-2 text-xs text-slate-500">Formato CSV com separador “;”, pronto para abrir no Excel.</p>
       </section>
     </div>
   );

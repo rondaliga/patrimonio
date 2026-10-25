@@ -62,3 +62,16 @@ test('todo import relativo de src/ aponta para um arquivo existente', () => {
   }
   assert.deepEqual(missing, []);
 });
+
+test('desempenho: páginas em chunks, adaptadores sob demanda e service worker', () => {
+  assert.match(read('src/App.jsx'), /lazy\(/);
+  const idx = read('src/services/index.js');
+  assert.match(idx, /import\('\.\/supabaseAdapter\.js'\)/);
+  assert.match(idx, /import\('\.\/localAdapter\.js'\)/);
+  assert.doesNotMatch(idx, /^import .*(supabase|localAdapter)/m, 'adaptadores não podem ser importados de forma estática');
+  for (const f of ['src/context/AuthContext.jsx', 'src/context/DataContext.jsx']) {
+    assert.doesNotMatch(read(f), /services\/index\.js/, `${f} não deve importar o índice dos serviços`);
+  }
+  assert.match(read('vite.config.js'), /manualChunks/);
+  assert.ok(has('public/sw.js'));
+});

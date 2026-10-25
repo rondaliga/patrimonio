@@ -33,21 +33,33 @@ export function createLocalAdapter({ storage = createStorage(), now = () => new 
     return { version: DB_VERSION, sectors: data.sectors, assets: data.assets, events, seq: events.length };
   }
 
+  // Cópia em memória do banco: evita reler e interpretar o JSON inteiro do localStorage a
+  // cada operação. É descartada quando outra aba grava (evento `storage`) ou quando algo falha.
+  let cache = null;
+
   function read() {
+    if (cache) return cache;
     let db = storage.load();
     if (!isDb(db)) {
       db = fresh(seed(now()));
       storage.save(db);
     }
+    cache = db;
     return db;
   }
 
-  // Lê, aplica a mudança e grava. Se `fn` lançar erro, nada é gravado.
+  // Lê, aplica a mudança e grava. Se `fn` lançar erro, nada é gravado e a cópia em
+  // memória é descartada (pode ter sido alterada pela metade).
   async function mutate(fn) {
     const db = read();
-    const result = fn(db);
-    storage.save(db);
-    return result;
+    try {
+      const result = fn(db);
+      storage.save(db);
+      return result;
+    } catch (e) {
+      cache = null;
+      throw e;
+    }
   }
 
   const addEvents = (db, events) => {
@@ -75,9 +87,38 @@ export function createLocalAdapter({ storage = createStorage(), now = () => new 
     capabilities: { demo: true, import: true },
     persistent: storage.persistent,
 
-    async snapshot() {
+    // `recentDays`: devolve só os eventos desse período (o histórico completo sai por eventsFor/allEvents).
+    // Os arrays são cópias rasas: o estado do React nunca compartilha array com a cópia interna.
+    async snapshot({ recentDays } = {}) {
       const { sectors, assets, events } = read();
-      return { sectors, assets, events };
+      let list = events;
+      if (recentDays) {
+        const since = new Date(new Date(now()).getTime() - recentDays * 86400000).toISOString();
+        list = events.filter((e) => e.at >= since);
+      }
+      return { sectors: [...sectors], assets: [...assets], events: list === events ? [...events] : list };
+    },
+
+    async sectors() {
+      return [...read().sectors];
+    },
+
+    // Histórico completo de um ativo (mais recente primeiro).
+    async eventsFor(tag) {
+      return read().events.filter((e) => e.tag === tag).sort((a, b) => b.at.localeCompare(a.at));
+    },
+
+    // Eventos com id maior que `id` (usado para buscar só o que acabou de acontecer).
+    async eventsAfter(id) {
+      return read().events.filter((e) => e.id > id);
+    },
+
+    async allEvents() {
+      return [...read().events];
+    },
+
+    async countEvents() {
+      return read().events.length;
     },
 
     // ---- Ativos ----
@@ -207,7 +248,10 @@ export function createLocalAdapter({ storage = createStorage(), now = () => new 
     subscribe(cb) {
       if (typeof window === 'undefined') return () => {};
       const onStorage = (e) => {
-        if (e.key === storage.key || e.key === null) cb();
+        if (e.key === storage.key || e.key === null) {
+          cache = null; // outra aba gravou: a cópia em memória ficou velha
+          cb(); // sem detalhes da mudança => o app recarrega tudo
+        }
       };
       window.addEventListener('storage', onStorage);
       return () => window.removeEventListener('storage', onStorage);
