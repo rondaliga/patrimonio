@@ -390,7 +390,7 @@ begin
   select id from auth.users
   on conflict (id) do nothing;
 
-  if v_email = 'rauancostadev@gmail.com then
+  if v_email = 'SEU@EMAIL.COM' then
     raise notice 'ATENÇÃO: nenhum administrador definido. Troque SEU@EMAIL.COM pelo seu e-mail e rode de novo.';
     return;
   end if;
