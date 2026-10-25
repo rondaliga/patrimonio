@@ -203,3 +203,35 @@ test('cache em memória: erro de validação não deixa estado pela metade; outr
   assert.equal(notified, 1);
   assert.ok((await api.snapshot()).assets.some((a) => a.tag === 'COL-9200'));
 });
+
+test('apagar histórico: tudo ou só o anterior a uma data; ativos e status permanecem', async () => {
+  const { api } = make();
+  const before = await api.snapshot();
+  const loans = before.assets.filter((a) => a.status === 'in_use').length;
+  const total = before.events.length;
+  assert.ok(total > 0 && loans > 0);
+
+  // só o anterior a 7 dias
+  const cutoff = new Date(NOW.getTime() - 7 * 86400000).toISOString();
+  const removed = await api.clearHistory({ before: cutoff });
+  const mid = await api.snapshot();
+  assert.ok(removed > 0 && removed < total);
+  assert.equal(mid.events.length, total - removed);
+  assert.ok(mid.events.every((e) => e.at >= cutoff));
+
+  // tudo
+  const rest = await api.clearHistory();
+  assert.equal(rest, total - removed);
+  const after = await api.snapshot();
+  assert.equal(after.events.length, 0);
+  assert.equal(after.assets.length, before.assets.length);
+  assert.equal(after.assets.filter((a) => a.status === 'in_use').length, loans);
+  assert.equal(await api.countEvents(), 0);
+
+  // novos eventos continuam com ids crescentes (sem reaproveitar números)
+  await api.createAsset({ tag: 'MON-9300', name: 'Monitor', category: 'monitor', sectorId: 'uti' });
+  const [ev] = (await api.snapshot()).events;
+  assert.ok(ev.id > total);
+  assert.equal(await api.clearHistory(), 1);
+  assert.equal(await api.clearHistory(), 0);
+});

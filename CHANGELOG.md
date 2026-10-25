@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.0 — apagar histórico
+- **Configurações → Histórico → Apagar histórico:** remove o registro de movimentações (atividade recente, últimas movimentações, histórico de cada ativo e dados dos relatórios). Dá para apagar tudo ou só o anterior a 30 dias, 90 dias ou 1 ano. Os ativos e a situação atual deles (em uso, em manutenção…) não mudam. Pede confirmação e só aparece para administradores.
+- Modo local: a numeração dos eventos continua crescendo (não reaproveita números).
+- Modo online (Supabase): nova função `clear_history(p_before)` no banco, restrita ao administrador (o histórico continua sem DELETE direto pelo front-end). **Rode o `supabase/schema.sql` de novo.** Outras sessões abertas atualizam em tempo real.
+- Ativos sem movimentações passam a poder ser excluídos depois de apagar o histórico (regra de exclusão inalterada).
+
 ## 1.3.3 — tudo em português
 - "check-out" / "check-in" viraram "retirada" / "devolução" na interface (menu, títulos, botões, avisos, relatórios, mensagens de erro e do banco). "Dashboard" virou "Painel". "walkie-talkies" virou "rádios comunicadores".
 - O CSV de movimentações exportava o tipo do evento em inglês (`checkout`, `checkin`…); agora sai "Retirada", "Devolução", etc.

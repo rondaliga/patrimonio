@@ -44,6 +44,11 @@ export function mergeEvents(data, incoming) {
   return { ...data, events };
 }
 
+export function removeEvent(data, id) {
+  if (!data.events.some((e) => e.id === id)) return data;
+  return { ...data, events: data.events.filter((e) => e.id !== id) };
+}
+
 // Setores são poucos: a lista inteira vem do adaptador (já na ordem certa) e só substitui a anterior.
 export const setSectors = (data, sectors) => ({ ...data, sectors });
 
@@ -57,6 +62,8 @@ export function applyChange(data, change) {
       return removeAsset(data, change.tag);
     case 'event':
       return mergeEvents(data, [change.event]);
+    case 'event-removed':
+      return removeEvent(data, change.id);
     default:
       return null;
   }

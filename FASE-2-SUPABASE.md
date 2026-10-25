@@ -58,6 +58,7 @@ no GitHub Pages. **O código já está pronto**: `supabaseAdapter.js`, tela de l
 ## Limitações do modo online
 
 - "Importar backup", "Restaurar demonstração" e "Apagar todos os ativos" não existem (são do modo local).
+- "Apagar histórico" (Configurações) existe nos dois modos, mas no online só o administrador consegue: a exclusão passa pela função `clear_history` do banco (o front-end não tem DELETE direto em `events`). Rode o `schema.sql` de novo para criá-la.
 - Excluir ativo só é permitido ao admin e apenas para ativos sem movimentações; os demais devem ser baixados.
 
 ## Cuidados (LGPD e operação)

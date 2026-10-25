@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyChange, lastEventId, mergeEvents, removeAsset, setSectors, upsertAsset } from '../src/services/patch.js';
+import { applyChange, lastEventId, mergeEvents, removeAsset, removeEvent, setSectors, upsertAsset } from '../src/services/patch.js';
 
 const asset = (tag, extra = {}) => ({ tag, name: tag, category: 'radio', status: 'available', sectorId: 'uti', ...extra });
 const base = () => ({
@@ -45,4 +45,11 @@ test('applyChange traduz as mudanças do tempo real e devolve null quando não s
   assert.equal(applyChange(d, { kind: 'sectors' }), null);
   assert.equal(applyChange(d, undefined), null);
   assert.deepEqual(setSectors(d, [{ id: 'ps', name: 'PS' }]).sectors, [{ id: 'ps', name: 'PS' }]);
+});
+
+test('removeEvent tira só o evento indicado (e mantém a identidade se ele não existe)', () => {
+  const d = base();
+  assert.equal(removeEvent(d, 999), d);
+  assert.deepEqual(removeEvent(d, 1).events.map((e) => e.id), [2]);
+  assert.deepEqual(applyChange(d, { kind: 'event-removed', id: 2 }).events.map((e) => e.id), [1]);
 });

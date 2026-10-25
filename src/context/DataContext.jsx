@@ -3,6 +3,7 @@ import { useToast } from './ToastContext.jsx';
 import { useAuth } from './AuthContext.jsx';
 import { can as canRole } from '../lib/permissions.js';
 import { computeStats } from '../services/stats.js';
+import { plural } from '../lib/format.js';
 import {
   EVENTS_WINDOW_DAYS,
   applyChange,
@@ -128,6 +129,11 @@ export function DataProvider({ children, api }) {
       importData: run((d) => api.importData(d), reload, 'Backup importado.'),
       resetDemo: run(() => api.resetDemo(), reload, 'Dados de demonstração restaurados.'),
       clearAll: run(() => api.clearAll(), reload, 'Todos os ativos foram apagados.'),
+      clearHistory: run(
+        (opts) => api.clearHistory(opts),
+        reload,
+        (n) => (n ? `Histórico apagado (${plural(n, 'registro', 'registros')}).` : 'Não havia registros para apagar.')
+      ),
       exportData: () => api.exportData(),
       // Consultas sob demanda (o estado só guarda os eventos recentes)
       eventsFor: (tag) => api.eventsFor(tag),

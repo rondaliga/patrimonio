@@ -156,7 +156,23 @@ test('tempo real: mudanças chegam descritas (ativo, evento, setor)', () => {
   fire('events', { eventType: 'INSERT', new: { id: 9, tag: 'A', type: 'edited', at: '2026-10-20T10:00:00Z' } });
   fire('events', { eventType: 'DELETE', old: { id: 9 } });
   fire('sectors', { eventType: 'INSERT' });
-  assert.deepEqual(got.map((c) => c.kind), ['asset', 'asset-removed', 'event', 'sectors']);
+  assert.deepEqual(got.map((c) => c.kind), ['asset', 'asset-removed', 'event', 'event-removed', 'sectors']);
+  assert.equal(got[3].id, 9);
   assert.equal(got[0].asset.status, 'maintenance');
   assert.equal(got[1].tag, 'RAD-0001');
+});
+
+test('clearHistory chama a função do banco (com ou sem data) e devolve a quantidade', async () => {
+  const client = fakeClient({ rpcs: { clear_history: 12 } });
+  const api = createSupabaseAdapter(client);
+  assert.equal(api.capabilities.clearHistory, true);
+  assert.equal(await api.clearHistory(), 12);
+  assert.deepEqual(client.calls.at(-1), { rpc: 'clear_history', args: { p_before: null } });
+  await api.clearHistory({ before: '2026-01-01T00:00:00.000Z' });
+  assert.deepEqual(client.calls.at(-1).args, { p_before: '2026-01-01T00:00:00.000Z' });
+});
+
+test('clearHistory sem permissão vira ValidationError', async () => {
+  const client = fakeClient({ errors: { clear_history: { code: '42501', message: 'Sem permissão para esta operação.' } } });
+  await assert.rejects(createSupabaseAdapter(client).clearHistory(), (e) => e instanceof ValidationError && /permissão/.test(e.message));
 });

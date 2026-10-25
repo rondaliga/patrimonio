@@ -303,6 +303,22 @@ begin
 end
 $$;
 
+-- Apagar o histórico de movimentações (só administrador). Sem argumento apaga tudo;
+-- com p_before apaga apenas os eventos anteriores a essa data. Os ativos não são alterados.
+-- O front-end não tem DELETE direto na tabela de eventos: só esta função (que confere o papel).
+create or replace function public.clear_history(p_before timestamptz default null)
+returns bigint
+language plpgsql security definer set search_path = public as
+$$
+declare n bigint;
+begin
+  perform public._require_role('admin');
+  delete from public.events where p_before is null or at < p_before;
+  get diagnostics n = row_count;
+  return n;
+end
+$$;
+
 -- ---------- Permissões (princípio do menor privilégio) ----------
 
 revoke all on all tables    in schema public from anon, authenticated;
@@ -324,6 +340,7 @@ grant execute on function public.checkin_asset(text, text, text)            to a
 grant execute on function public.send_to_maintenance(text, text, text)      to authenticated;
 grant execute on function public.complete_maintenance(text, text)           to authenticated;
 grant execute on function public.retire_asset(text, text)                   to authenticated;
+grant execute on function public.clear_history(timestamptz)                 to authenticated;
 
 -- ---------- Row Level Security ----------
 

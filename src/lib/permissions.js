@@ -15,6 +15,7 @@ const MATRIX = {
   maintenance: ['admin', 'tecnico'], // enviar, concluir, baixar
   'sector.manage': ['admin'],
   'data.admin': ['admin'], // importar / restaurar demo / apagar tudo
+  'history.clear': ['admin'], // apagar o histórico de movimentações
 };
 
 export const can = (role, action) => (MATRIX[action] ?? []).includes(role);

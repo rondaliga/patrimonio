@@ -102,6 +102,18 @@ select t.login('00000000-0000-0000-0000-0000000000c3');
 select t.ok((select count(*) from public.profiles) = 1, 'demais usuários só veem o próprio perfil');
 with u as (update public.profiles set role='admin' where id='00000000-0000-0000-0000-0000000000c3' returning 1) select t.ok((select count(*) from u) = 0, 'ninguém se promove a admin');
 
+\echo == APAGAR HISTÓRICO
+select t.login('00000000-0000-0000-0000-0000000000c3');
+select t.fails($$select public.clear_history()$$, 'Sem permissão', 'enfermagem não apaga o histórico');
+select t.login('00000000-0000-0000-0000-0000000000b2');
+select t.fails($$select public.clear_history()$$, 'Sem permissão', 'técnico não apaga o histórico');
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select t.ok((select count(*) from public.events) > 0, 'há histórico para apagar');
+select t.ok(public.clear_history(now() - interval '1 day') = 0, 'apagar só o antigo não remove eventos recentes');
+select t.ok(public.clear_history() > 0, 'admin apaga todo o histórico');
+select t.ok((select count(*) from public.events) = 0, 'histórico vazio depois de apagar');
+select t.ok((select count(*) from public.assets where tag='RAD-0001') = 1, 'os ativos permanecem');
+
 \echo == ANÔNIMO
 reset role; set local role anon;
 select t.fails($$select * from public.assets$$, 'permission denied', 'anônimo não lê ativos');

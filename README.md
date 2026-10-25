@@ -17,7 +17,7 @@ O modo é escolhido automaticamente: com `VITE_SUPABASE_URL` e `VITE_SUPABASE_AN
 - **Manutenção e esterilização:** fila com motivo e tempo parado, conclusão e baixa definitiva.
 - **Setores e alas:** contagem por status e cadastro de novos setores.
 - **Relatórios:** empréstimos prolongados (> 12 h), tempo médio, retiradas por setor e exportação CSV.
-- **Configurações:** backup/restauração em JSON, dados de demonstração.
+- **Configurações:** backup/restauração em JSON, apagar o histórico de movimentações (tudo ou só o anterior a 30 dias, 90 dias ou 1 ano; somente administrador) e dados de demonstração.
 - **Login e papéis** (modo online): administrador, técnico, enfermagem e consulta; a interface esconde o que o perfil não pode fazer e o banco bloqueia de qualquer forma.
 - Layout responsivo (menu lateral vira gaveta no celular) e abas sincronizadas entre si.
 

@@ -54,7 +54,7 @@ export function createSupabaseAdapter(client, { now = () => new Date() } = {}) {
     mode: 'supabase',
     persistent: true,
     // Operações em massa só existem no modo local
-    capabilities: { demo: false, import: false },
+    capabilities: { demo: false, import: false, clearHistory: true },
     snapshot,
 
     // ---- Ativos ----
@@ -137,6 +137,10 @@ export function createSupabaseAdapter(client, { now = () => new Date() } = {}) {
       const { sectors, assets, events } = await snapshot();
       return { app: 'patrimonio-hospitalar', version: DB_VERSION, exportedAt: new Date(now()).toISOString(), sectors, assets, events };
     },
+    // Só administradores (a função do banco confere o papel). Devolve quantos registros foram removidos.
+    async clearHistory({ before } = {}) {
+      return Number(await run(client.rpc('clear_history', { p_before: before ?? null }))) || 0;
+    },
     importData: unavailable, // migração: scripts/backup-to-sql.mjs
     resetDemo: unavailable,
     clearAll: unavailable,
@@ -149,6 +153,7 @@ export function createSupabaseAdapter(client, { now = () => new Date() } = {}) {
         cb(p.eventType === 'DELETE' ? { kind: 'asset-removed', tag: p.old?.tag } : { kind: 'asset', asset: rowToAsset(p.new) });
       const onEvent = (p) => {
         if (p.eventType === 'INSERT') cb({ kind: 'event', event: rowToEvent(p.new) });
+        else if (p.eventType === 'DELETE' && p.old?.id != null) cb({ kind: 'event-removed', id: p.old.id });
       };
       const ch = client
         .channel('patrimonio-changes')
