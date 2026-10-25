@@ -382,7 +382,7 @@ on conflict do nothing;
 
 do $$
 declare
-  v_email text := 'SEU@EMAIL.COM';
+  v_email text := 'rauancostadev@gmail.com';
   v_id    uuid;
 begin
   -- usuários criados antes deste script ganham perfil
@@ -390,7 +390,7 @@ begin
   select id from auth.users
   on conflict (id) do nothing;
 
-  if v_email = 'SEU@EMAIL.COM' then
+  if v_email = 'rauancostadev@gmail.com then
     raise notice 'ATENÇÃO: nenhum administrador definido. Troque SEU@EMAIL.COM pelo seu e-mail e rode de novo.';
     return;
   end if;
