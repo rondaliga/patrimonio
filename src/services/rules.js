@@ -90,7 +90,7 @@ export function canDelete(asset, events) {
 // Cada função devolve { asset, events } — o chamador persiste.
 
 export function applyCheckOut(asset, { user, sectorId, note, at }, sectors) {
-  assertStatus(asset, ['available'], 'fazer check-out', 'Só ativos disponíveis podem ser retirados.');
+  assertStatus(asset, ['available'], 'registrar a retirada', 'Só ativos disponíveis podem ser retirados.');
   const errors = {};
   if (clean(user).length < 2) errors.user = 'Informe quem está retirando.';
   if (!sectors.some((s) => s.id === sectorId)) errors.sectorId = 'Escolha o setor de destino.';
@@ -108,7 +108,7 @@ export function applyCheckOut(asset, { user, sectorId, note, at }, sectors) {
 }
 
 export function applyCheckIn(asset, { condition = 'ok', note, at }) {
-  assertStatus(asset, ['in_use'], 'fazer check-in', 'Só ativos em uso podem ser devolvidos.');
+  assertStatus(asset, ['in_use'], 'registrar a devolução', 'Só ativos em uso podem ser devolvidos.');
   if (!['ok', ...Object.keys(MAINTENANCE_KINDS)].includes(condition)) {
     throw new ValidationError('Condição inválida.', { condition: 'Escolha a condição do ativo.' });
   }
@@ -133,7 +133,7 @@ export function applyCheckIn(asset, { condition = 'ok', note, at }) {
 }
 
 export function applySendToMaintenance(asset, { kind, reason, at }) {
-  assertStatus(asset, ['available'], 'enviar para manutenção', 'Se estiver em uso, faça o check-in primeiro.');
+  assertStatus(asset, ['available'], 'enviar para manutenção', 'Se estiver em uso, faça a devolução primeiro.');
   if (!MAINTENANCE_KINDS[kind]) {
     throw new ValidationError('Escolha o tipo.', { kind: 'Escolha manutenção ou esterilização.' });
   }
@@ -156,7 +156,7 @@ export function applyCompleteMaintenance(asset, { note, at }) {
 }
 
 export function applyRetire(asset, { reason, at }) {
-  assertStatus(asset, ['available', 'maintenance'], 'dar baixa', 'Se estiver em uso, faça o check-in primeiro.');
+  assertStatus(asset, ['available', 'maintenance'], 'dar baixa', 'Se estiver em uso, faça a devolução primeiro.');
   assertText(reason, 3, 'reason', 'Informe o motivo da baixa.');
   const why = clean(reason);
   return {

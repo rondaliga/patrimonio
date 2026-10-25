@@ -13,10 +13,10 @@ import {
 import pkg from '../../../package.json';
 
 export const NAV = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/', label: 'Painel', icon: LayoutDashboard },
   { to: '/ativos', label: 'Ativos', icon: Boxes },
   { to: '/setores', label: 'Setores e Alas', icon: MapPin },
-  { to: '/movimentacao', label: 'Check-in / Check-out', icon: ArrowLeftRight },
+  { to: '/movimentacao', label: 'Retirada / Devolução', icon: ArrowLeftRight },
   { to: '/manutencao', label: 'Manutenção', icon: Wrench, badge: 'maintenance' },
   { to: '/relatorios', label: 'Relatórios', icon: ClipboardList },
   { to: '/config', label: 'Configurações', icon: Settings },

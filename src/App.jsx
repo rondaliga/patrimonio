@@ -27,10 +27,10 @@ function PageSkeleton() {
 }
 
 const TITLES = {
-  '/': 'Dashboard',
+  '/': 'Painel',
   '/ativos': 'Ativos',
   '/setores': 'Setores e Alas',
-  '/movimentacao': 'Check-in / Check-out',
+  '/movimentacao': 'Retirada / Devolução',
   '/manutencao': 'Manutenção e Esterilização',
   '/relatorios': 'Relatórios',
   '/config': 'Configurações',
@@ -62,7 +62,7 @@ function resolve(path, query) {
         title: 'Página não encontrada',
         element: (
           <div className="card p-10 text-center text-sm text-slate-500">
-            Página não encontrada. <a className="text-brand-600 underline" href="#/">Voltar ao dashboard</a>
+            Página não encontrada. <a className="text-brand-600 underline" href="#/">Voltar ao painel</a>
           </div>
         ),
       };

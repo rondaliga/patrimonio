@@ -83,7 +83,7 @@ export default function CheckInForm({ initialTag = '', lockAsset = false, onDone
       <FormError message={formError && !Object.keys(errors).length ? formError : ''} />
       <button type="submit" className="btn btn-primary mt-auto w-full" disabled={busy}>
         <LogIn className="h-4 w-4" />
-        Registrar check-in
+        Registrar devolução
       </button>
     </form>
   );

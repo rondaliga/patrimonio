@@ -9,20 +9,20 @@ O modo é escolhido automaticamente: com `VITE_SUPABASE_URL` e `VITE_SUPABASE_AN
 
 ## O que o sistema faz
 
-- **Dashboard** com métricas clicáveis, gráficos por setor/status, empréstimos ativos e atividade recente.
+- **Painel** com métricas clicáveis, gráficos por setor/status, empréstimos ativos e atividade recente.
 - **Ativos:** lista densa com busca (ignora acentos), filtros por status/setor/categoria, paginação e CSV;
   cadastro, edição, exclusão (só sem histórico) e página de detalhe com histórico completo.
-- **Check-out / Check-in rápido:** retirada com responsável e setor de destino; devolução informando a
+- **Retirada / Devolução rápida:** retirada com responsável e setor de destino; devolução informando a
   condição (bom estado, precisa de manutenção ou esterilização). Aceita digitar ou escanear o patrimônio.
 - **Manutenção e esterilização:** fila com motivo e tempo parado, conclusão e baixa definitiva.
 - **Setores e alas:** contagem por status e cadastro de novos setores.
-- **Relatórios:** empréstimos prolongados (> 12 h), tempo médio, check-outs por setor e exportação CSV.
+- **Relatórios:** empréstimos prolongados (> 12 h), tempo médio, retiradas por setor e exportação CSV.
 - **Configurações:** backup/restauração em JSON, dados de demonstração.
 - **Login e papéis** (modo online): administrador, técnico, enfermagem e consulta; a interface esconde o que o perfil não pode fazer e o banco bloqueia de qualquer forma.
 - Layout responsivo (menu lateral vira gaveta no celular) e abas sincronizadas entre si.
 
 Regras do ciclo de vida: `Disponível → Em uso → Disponível`, `Disponível/Em uso* → Manutenção → Disponível`
-e `Disponível/Manutenção → Baixado` (definitivo). *Ativo em uso precisa de check-in antes.
+e `Disponível/Manutenção → Baixado` (definitivo). *Ativo em uso precisa de devolução antes.
 
 ## Publicar no GitHub Pages (automático)
 
@@ -93,7 +93,7 @@ src/
 │  ├─ storage.js · seed.js · stats.js · index.js (loadApi)
 ├─ context/              AuthContext (login/papel), DataContext (dados + ações) e ToastContext
 ├─ router/               roteador por hash (#/ativos/RAD-0042) e carregamento das páginas (routes.js)
-├─ pages/                Dashboard, Ativos, Detalhe, Setores, Check-in/out, Manutenção, Relatórios, Config
+├─ pages/                Painel, Ativos, Detalhe, Setores, Retirada/Devolução, Manutenção, Relatórios, Config
 ├─ components/           layout, dashboard, forms, ui
 ├─ lib/                  status, formatação, CSV (+ colunas), permissões, download
 ├─ App.jsx · main.jsx · index.css

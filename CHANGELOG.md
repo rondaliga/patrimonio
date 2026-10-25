@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.3 — tudo em português
+- "check-out" / "check-in" viraram "retirada" / "devolução" na interface (menu, títulos, botões, avisos, relatórios, mensagens de erro e do banco). "Dashboard" virou "Painel". "walkie-talkies" virou "rádios comunicadores".
+- O CSV de movimentações exportava o tipo do evento em inglês (`checkout`, `checkin`…); agora sai "Retirada", "Devolução", etc.
+- Teste automático impede o retorno de termos em inglês na interface.
+- **Supabase:** rode o `supabase/schema.sql` de novo para atualizar as mensagens de erro das funções do banco.
+
+## 1.3.2
+- Tabelas: os títulos das colunas numéricas (Setores: Total, Disponível, Em uso…) ficavam alinhados à esquerda, longe dos números alinhados à direita. A regra base de `th` tinha especificidade maior que `text-right`; agora o alinhamento padrão fica na camada base e `text-right` prevalece.
+
 ## 1.3.1 — revisão visual e de textos
 **Visual**
 - Manutenção: os botões "Concluir" ficavam cortados no desktop e escondidos (só com rolagem lateral) no celular. A lista agora cabe no cartão, e no celular tipo, motivo e tempo parado aparecem sob o nome do ativo.

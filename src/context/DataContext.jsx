@@ -105,9 +105,9 @@ export function DataProvider({ children, api }) {
       createAsset: run((i) => api.createAsset(i), asset, (a) => `Ativo ${a.tag} cadastrado.`),
       updateAsset: run((t, p) => api.updateAsset(t, p), asset, (a) => `Ativo ${a.tag} atualizado.`),
       deleteAsset: run((t) => api.deleteAsset(t), (_, t) => commit((d) => removeAsset(d, t)), (_, t) => `Ativo ${t} excluído.`),
-      checkOut: run((t, p) => api.checkOut(t, p), asset, (a) => `Check-out de ${a.tag} registrado.`),
+      checkOut: run((t, p) => api.checkOut(t, p), asset, (a) => `Retirada de ${a.tag} registrada.`),
       checkIn: run((t, p) => api.checkIn(t, p), asset, (a) =>
-        a.status === 'maintenance' ? `${a.tag} devolvido e enviado para manutenção.` : `Check-in de ${a.tag} registrado.`
+        a.status === 'maintenance' ? `${a.tag} devolvido e enviado para manutenção.` : `Devolução de ${a.tag} registrada.`
       ),
       sendToMaintenance: run((t, p) => api.sendToMaintenance(t, p), asset, (a) => `${a.tag} enviado para ${a.maintenance.kind === 'sterilization' ? 'esterilização' : 'manutenção'}.`),
       completeMaintenance: run((t, p) => api.completeMaintenance(t, p), asset, (a) => `${a.tag} liberado: disponível.`),

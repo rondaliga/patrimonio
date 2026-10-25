@@ -55,7 +55,7 @@ export default function ReportsPage() {
   return (
     <div className="space-y-4">
       <section className="grid gap-4 sm:grid-cols-3">
-        <MetricCard label={`Check-outs (${DAYS} dias)`} value={r.checkouts} icon={LogOut} tone="blue" />
+        <MetricCard label={`Retiradas (${DAYS} dias)`} value={r.checkouts} icon={LogOut} tone="blue" />
         <MetricCard
           label="Tempo médio de empréstimo"
           value={r.avg == null ? '—' : r.avg < 1 ? `${Math.round(r.avg * 60)} min` : `${r.avg.toFixed(1).replace('.', ',')} h`}
@@ -103,7 +103,7 @@ export default function ReportsPage() {
 
         <section className="card">
           <div className="card-header">
-            <h2 className="card-title">Check-outs por setor de destino ({DAYS} dias)</h2>
+            <h2 className="card-title">Retiradas por setor de destino ({DAYS} dias)</h2>
           </div>
           {r.bySector.length === 0 ? (
             <EmptyState title="Sem movimentações no período" />

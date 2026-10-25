@@ -44,14 +44,14 @@ export default function Dashboard() {
       {/* Linha 1 — métricas rápidas */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Total de ativos" value={stats.total} hint="em todos os setores" icon={Boxes} tone="slate" href="#/ativos" />
-        <MetricCard label="Disponíveis" value={st.available} hint="prontos para check-out" icon={BadgeCheck} tone="green" href="#/ativos?status=available" />
+        <MetricCard label="Disponíveis" value={st.available} hint="prontos para retirada" icon={BadgeCheck} tone="green" href="#/ativos?status=available" />
         <MetricCard label="Em uso" value={st.in_use} hint={`${stats.activeLoans.length} ${stats.activeLoans.length === 1 ? 'emprestado' : 'emprestados'} agora`} icon={ArrowLeftRight} tone="blue" href="#/ativos?status=in_use" />
         <MetricCard label="Manutenção / Esterilização" value={st.maintenance} hint={`${st.retired} baixados`} icon={Wrench} tone="amber" href="#/manutencao" />
       </section>
 
       {/* Linha 2 — itens compartilhados em destaque */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <MetricCard label="Rádios emprestados" value={stats.radiosLoaned} hint="walkie-talkies em check-out" icon={Radio} tone="blue" href="#/ativos?categoria=radio&status=in_use" />
+        <MetricCard label="Rádios emprestados" value={stats.radiosLoaned} hint="rádios comunicadores em uso" icon={Radio} tone="blue" href="#/ativos?categoria=radio&status=in_use" />
         <MetricCard label="Cadeiras de rodas alocadas" value={stats.chairsLoaned} hint="fora do estoque central" icon={Accessibility} tone="blue" href="#/ativos?categoria=wheelchair&status=in_use" />
       </section>
 

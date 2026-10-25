@@ -7,7 +7,7 @@ export default function ActiveLoansTable({ loans }) {
   return (
     <div className="card">
       <div className="card-header">
-        <h2 className="card-title">Empréstimos ativos (check-out)</h2>
+        <h2 className="card-title">Empréstimos ativos</h2>
         <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-semibold text-sky-800">{loans.length}</span>
       </div>
       {loans.length === 0 ? (
@@ -49,9 +49,9 @@ export default function ActiveLoansTable({ loans }) {
                       </span>
                     </td>
                     <td className="text-right">
-                      <a href={`#/movimentacao?tag=${encodeURIComponent(l.tag)}`} aria-label={`Check-in de ${l.tag}`} className="btn btn-secondary btn-sm">
+                      <a href={`#/movimentacao?tag=${encodeURIComponent(l.tag)}`} aria-label={`Devolver ${l.tag}`} className="btn btn-secondary btn-sm">
                         <LogIn className="h-3.5 w-3.5" />
-                        <span className="hidden md:inline">Check-in</span>
+                        <span className="hidden md:inline">Devolver</span>
                       </a>
                     </td>
                   </tr>

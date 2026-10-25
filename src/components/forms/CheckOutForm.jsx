@@ -103,7 +103,7 @@ export default function CheckOutForm({ initialTag = '', lockAsset = false, onDon
       <FormError message={formError && !Object.keys(errors).length ? formError : ''} />
       <button type="submit" className="btn btn-primary mt-auto w-full" disabled={busy}>
         <LogOut className="h-4 w-4" />
-        Registrar check-out
+        Registrar retirada
       </button>
     </form>
   );

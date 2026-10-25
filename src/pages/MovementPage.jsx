@@ -30,7 +30,7 @@ export default function MovementPage({ query }) {
       <div className="grid gap-4 lg:grid-cols-2">
         {canMove && <section className="card flex flex-col">
           <div className="card-header">
-            <h2 className="card-title flex items-center gap-2"><LogOut className="h-4 w-4 text-sky-600" /> Check-out (retirada)</h2>
+            <h2 className="card-title flex items-center gap-2"><LogOut className="h-4 w-4 text-sky-600" /> Retirada</h2>
           </div>
           <div className="flex flex-1 flex-col p-4">
             <CheckOutForm initialTag={preset?.status === 'available' ? preset.tag : ''} />
@@ -38,7 +38,7 @@ export default function MovementPage({ query }) {
         </section>}
         {canMove && <section className="card flex flex-col">
           <div className="card-header">
-            <h2 className="card-title flex items-center gap-2"><LogIn className="h-4 w-4 text-emerald-600" /> Check-in (devolução)</h2>
+            <h2 className="card-title flex items-center gap-2"><LogIn className="h-4 w-4 text-emerald-600" /> Devolução</h2>
           </div>
           <div className="flex flex-1 flex-col p-4">
             <CheckInForm initialTag={preset?.status === 'in_use' ? preset.tag : ''} />

@@ -16,12 +16,24 @@ export function assetColumns(sectorName, { withCreatedAt = false } = {}) {
   return cols;
 }
 
+// Tipos de evento em português (o banco guarda códigos em inglês; o CSV deve sair legível).
+export const EVENT_TYPE_LABELS = {
+  created: 'Cadastro',
+  edited: 'Edição',
+  checkout: 'Retirada',
+  checkin: 'Devolução',
+  maintenance: 'Manutenção',
+  sterilization: 'Esterilização',
+  restored: 'Liberação',
+  retired: 'Baixa',
+};
+
 export function eventColumns({ sectorName, getAsset, describeEvent }) {
   return [
     { label: 'Data/hora', value: (e) => e.at },
     { label: 'Patrimônio', value: (e) => e.tag },
     { label: 'Ativo', value: (e) => getAsset(e.tag)?.name ?? '' },
-    { label: 'Tipo', value: (e) => e.type },
+    { label: 'Tipo', value: (e) => EVENT_TYPE_LABELS[e.type] ?? e.type },
     { label: 'Descrição', value: (e) => describeEvent(e, e.sectorId ? sectorName(e.sectorId) : '') },
     { label: 'Responsável', value: (e) => e.user ?? '' },
     { label: 'Setor', value: (e) => (e.sectorId ? sectorName(e.sectorId) : '') },

@@ -39,7 +39,7 @@ set local role authenticated;
 select t.login('00000000-0000-0000-0000-0000000000d4');
 select t.ok((select count(*) from public.sectors) = 6, 'consulta enxerga os 6 setores');
 select t.fails($$insert into public.assets(tag,name,category,sector_id) values ('RAD-0001','Rádio','radio','uti')$$, 'row-level', 'consulta não cadastra ativo');
-select t.fails($$select public.checkout_asset('RAD-0001','Ana','uti')$$, 'Sem permissão', 'consulta não faz check-out');
+select t.fails($$select public.checkout_asset('RAD-0001','Ana','uti')$$, 'Sem permissão', 'consulta não faz retirada');
 select t.fails($$insert into public.events(tag,type) values ('RAD-0001','created')$$, 'permission denied', 'ninguém grava histórico direto');
 
 \echo == TÉCNICO
@@ -62,7 +62,7 @@ select t.fails($$insert into public.sectors(id,name) values ('x','Novo')$$, 'row
 select t.login('00000000-0000-0000-0000-0000000000c3');
 select public.checkout_asset('RAD-0001', '  Enf. Carlos ', 'ps', 'plantão noite');
 select t.ok((select status = 'in_use' and assigned_user = 'Enf. Carlos' and assigned_sector_id = 'ps' from public.assets where tag='RAD-0001'), 'check-out registra responsável e setor');
-select t.fails($$select public.checkout_asset('RAD-0001','Outro','uti')$$, 'check-out', 'não faz check-out de ativo em uso');
+select t.fails($$select public.checkout_asset('RAD-0001','Outro','uti')$$, 'retirada', 'não faz retirada de ativo em uso');
 select t.fails($$select public.send_to_maintenance('RAD-0001','maintenance','Teste')$$, 'Sem permissão', 'enfermagem não envia para manutenção');
 select t.fails($$select public.retire_asset('RAD-0001','Teste')$$, 'Sem permissão', 'enfermagem não dá baixa');
 with u as (update public.assets set name='Hackeado' where tag='RAD-0001' returning 1) select t.ok((select count(*) from u) = 0, 'enfermagem não edita cadastro (RLS: 0 linhas)');
@@ -70,7 +70,7 @@ select public.checkin_asset('RAD-0001', 'maintenance', 'Antena quebrada');
 select t.ok((select status = 'maintenance' and maint_reason = 'Antena quebrada' and assigned_user is null from public.assets where tag='RAD-0001'), 'check-in com defeito vai para manutenção e limpa o empréstimo');
 select t.ok((select string_agg(type, ',' order by id) from public.events where tag='RAD-0001') = 'created,edited,checkout,checkin,maintenance', 'histórico completo e na ordem certa');
 select t.ok((select count(*) from public.events where tag='RAD-0001' and actor is not null and type in ('checkout','checkin')) = 2, 'histórico registra quem fez (actor)');
-select t.fails($$select public.checkin_asset('RAD-0001','ok')$$, 'check-in', 'não devolve ativo que não está em uso');
+select t.fails($$select public.checkin_asset('RAD-0001','ok')$$, 'devolução', 'não devolve ativo que não está em uso');
 
 \echo == TÉCNICO (manutenção e baixa)
 select t.login('00000000-0000-0000-0000-0000000000b2');
@@ -82,7 +82,7 @@ select t.fails($$select public.send_to_maintenance('RAD-0001','sterilization','O
 select t.fails($$select public.retire_asset('RAD-0001','  ')$$, 'motivo', 'baixa exige motivo');
 select public.retire_asset('RAD-0001', 'Fim de vida útil');
 select t.ok((select status = 'retired' and retired_reason = 'Fim de vida útil' from public.assets where tag='RAD-0001'), 'baixa registrada');
-select t.fails($$select public.checkout_asset('RAD-0001','Ana','uti')$$, 'check-out', 'ativo baixado não sai mais');
+select t.fails($$select public.checkout_asset('RAD-0001','Ana','uti')$$, 'retirada', 'ativo baixado não sai mais');
 select t.fails($$select public.complete_maintenance('RAD-0001')$$, 'concluir', 'baixa é definitiva (não volta)');
 
 \echo == EXCLUSÃO

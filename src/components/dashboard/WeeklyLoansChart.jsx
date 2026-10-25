@@ -1,4 +1,4 @@
-// Mini gráfico de colunas — check-outs nos últimos 7 dias.
+// Mini gráfico de colunas — retiradas nos últimos 7 dias.
 // As barras usam posicionamento absoluto com altura em %, então acompanham a altura do card.
 export default function WeeklyLoansChart({ data, className = '' }) {
   const max = Math.max(1, ...data.map((d) => d.value));
@@ -6,7 +6,7 @@ export default function WeeklyLoansChart({ data, className = '' }) {
   return (
     <div className={`card flex flex-col ${className}`}>
       <div className="card-header">
-        <h2 className="card-title">Check-outs nos últimos 7 dias</h2>
+        <h2 className="card-title">Retiradas nos últimos 7 dias</h2>
       </div>
       <div className="flex min-h-48 flex-1 items-stretch gap-3 px-4 pb-3 pt-4">
         {data.map((d, i) => {

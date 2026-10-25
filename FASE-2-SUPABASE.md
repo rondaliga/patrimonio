@@ -17,8 +17,8 @@ no GitHub Pages. **O código já está pronto**: `supabaseAdapter.js`, tela de l
 | Papel | Pode |
 | --- | --- |
 | `admin` | tudo (inclui setores, exclusões e perfis) |
-| `tecnico` | cadastrar/editar ativos, manutenção, baixa, check-in/out |
-| `enfermagem` | check-in/out |
+| `tecnico` | cadastrar/editar ativos, manutenção, baixa, retirada/devolução |
+| `enfermagem` | retirada/devolução |
 | `consulta` | apenas ver |
 
 > O adaptador foi testado com um cliente simulado e o schema com PostgreSQL real, **mas não contra um

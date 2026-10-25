@@ -31,7 +31,7 @@ export default function AssetDetailPage({ tag }) {
   const asset = getAsset(tag);
 
   // O estado global guarda só os eventos recentes; o histórico completo deste ativo vem sob demanda
-  // (e é buscado de novo quando o ativo muda, ex.: após um check-in).
+  // (e é buscado de novo quando o ativo muda, ex.: após uma devolução).
   const [full, setFull] = useState(null);
   useEffect(() => {
     let alive = true;
@@ -73,13 +73,13 @@ export default function AssetDetailPage({ tag }) {
           </div>
           <div className="flex flex-wrap gap-2">
             {s === 'available' && can('movement') && (
-              <button className="btn btn-primary" onClick={() => setModal('checkout')}><LogOut className="h-4 w-4" /> Check-out</button>
+              <button className="btn btn-primary" onClick={() => setModal('checkout')}><LogOut className="h-4 w-4" /> Retirada</button>
             )}
             {s === 'available' && can('maintenance') && (
               <button className="btn btn-secondary" onClick={() => setModal('maintenance')}><Wrench className="h-4 w-4" /> Manutenção</button>
             )}
             {s === 'in_use' && can('movement') && (
-              <button className="btn btn-primary" onClick={() => setModal('checkin')}><LogIn className="h-4 w-4" /> Check-in</button>
+              <button className="btn btn-primary" onClick={() => setModal('checkin')}><LogIn className="h-4 w-4" /> Devolução</button>
             )}
             {s === 'maintenance' && can('maintenance') && (
               <button className="btn btn-primary" onClick={() => setModal('complete')}><BadgeCheck className="h-4 w-4" /> Concluir</button>
@@ -154,10 +154,10 @@ export default function AssetDetailPage({ tag }) {
         </ul>
       </div>
 
-      <Modal open={modal === 'checkout'} onClose={close} title={`Check-out — ${asset.tag}`}>
+      <Modal open={modal === 'checkout'} onClose={close} title={`Retirada — ${asset.tag}`}>
         <CheckOutForm initialTag={asset.tag} lockAsset onDone={close} />
       </Modal>
-      <Modal open={modal === 'checkin'} onClose={close} title={`Check-in — ${asset.tag}`}>
+      <Modal open={modal === 'checkin'} onClose={close} title={`Devolução — ${asset.tag}`}>
         <CheckInForm initialTag={asset.tag} lockAsset onDone={close} />
       </Modal>
       <Modal open={modal === 'maintenance'} onClose={close} title={`Enviar ${asset.tag} para manutenção`}>

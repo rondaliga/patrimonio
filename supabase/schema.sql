@@ -9,7 +9,7 @@
 -- Modelo de segurança:
 --   * Todos precisam estar logados (role "authenticated"); "anon" não acessa nada.
 --   * Papéis (tabela profiles): admin | tecnico | enfermagem | consulta
---   * Mudanças de estado (check-out, check-in, manutenção, baixa) SÓ acontecem pelas
+--   * Mudanças de estado (retirada, devolução, manutenção, baixa) SÓ acontecem pelas
 --     funções RPC abaixo, que validam o ciclo de vida e gravam o histórico na mesma
 --     transação. O front-end não consegue alterar status nem apagar o histórico.
 -- =====================================================================
@@ -87,7 +87,7 @@ create table if not exists public.events (
 );
 create index if not exists events_tag_at_idx on public.events (tag, at desc);
 create index if not exists events_at_idx on public.events (at desc);
--- empréstimos ativos (dashboard) e check-outs por período (relatórios/gráfico semanal)
+-- empréstimos ativos (painel) e retiradas por período (relatórios/gráfico semanal)
 create index if not exists assets_in_use_idx on public.assets (assigned_since) where status = 'in_use';
 create index if not exists events_type_at_idx on public.events (type, at desc);
 
@@ -174,7 +174,7 @@ begin
   perform public._require_role('admin', 'tecnico', 'enfermagem');
   a := public._lock_asset(p_tag);
   if a.status <> 'available' then
-    raise exception 'Não é possível fazer check-out: % está "%".', a.tag, a.status;
+    raise exception 'Não é possível registrar a retirada: % está "%".', a.tag, a.status;
   end if;
   if length(btrim(coalesce(p_user, ''))) < 2 then
     raise exception 'Informe quem está retirando.';
@@ -204,7 +204,7 @@ begin
   perform public._require_role('admin', 'tecnico', 'enfermagem');
   a := public._lock_asset(p_tag);
   if a.status <> 'in_use' then
-    raise exception 'Não é possível fazer check-in: % está "%".', a.tag, a.status;
+    raise exception 'Não é possível registrar a devolução: % está "%".', a.tag, a.status;
   end if;
   if p_condition not in ('ok', 'maintenance', 'sterilization') then
     raise exception 'Condição inválida.';
@@ -243,7 +243,7 @@ begin
   perform public._require_role('admin', 'tecnico');
   a := public._lock_asset(p_tag);
   if a.status <> 'available' then
-    raise exception 'Não é possível enviar para manutenção: % está "%". Se estiver em uso, faça o check-in primeiro.', a.tag, a.status;
+    raise exception 'Não é possível enviar para manutenção: % está "%". Se estiver em uso, faça a devolução primeiro.', a.tag, a.status;
   end if;
   if p_kind not in ('maintenance', 'sterilization') then
     raise exception 'Escolha manutenção ou esterilização.';
@@ -289,7 +289,7 @@ begin
   perform public._require_role('admin', 'tecnico');
   a := public._lock_asset(p_tag);
   if a.status not in ('available', 'maintenance') then
-    raise exception 'Não é possível dar baixa: % está "%". Se estiver em uso, faça o check-in primeiro.', a.tag, a.status;
+    raise exception 'Não é possível dar baixa: % está "%". Se estiver em uso, faça a devolução primeiro.', a.tag, a.status;
   end if;
   if length(btrim(coalesce(p_reason, ''))) < 3 then
     raise exception 'Informe o motivo da baixa.';

@@ -23,7 +23,7 @@ export default function MaintenanceForm({ initialTag = '', lockAsset = false, on
     errors.tag ||
     (tag.trim() && !found ? 'Patrimônio não encontrado. Escolha um item da lista.' : '') ||
     (found && !asset
-      ? `${found.tag} está "${STATUS[found.status].label}"${found.status === 'in_use' ? ' — faça o check-in antes' : ''}.`
+      ? `${found.tag} está "${STATUS[found.status].label}"${found.status === 'in_use' ? ' — faça a devolução antes' : ''}.`
       : '');
 
   const submit = async (e) => {
