@@ -84,7 +84,7 @@ export function createLocalAdapter({ storage = createStorage(), now = () => new 
 
   return {
     mode: 'local',
-    capabilities: { demo: true, import: true, clearHistory: true },
+    capabilities: { demo: true, import: true },
     persistent: storage.persistent,
 
     // `recentDays`: devolve só os eventos desse período (o histórico completo sai por eventsFor/allEvents).
@@ -232,15 +232,12 @@ export function createLocalAdapter({ storage = createStorage(), now = () => new 
       });
     },
 
-    // Apaga o histórico de movimentações (atividade recente, últimas movimentações, relatórios).
-    // `before` (ISO): apaga só os eventos anteriores a essa data; sem ele, apaga todos.
-    // Os ativos e o status atual deles não mudam. Devolve quantos registros foram removidos.
-    clearHistory({ before } = {}) {
+    // Exclui UM registro do histórico (o ativo e sua situação atual não mudam).
+    deleteEvent(id) {
       return mutate((db) => {
-        const kept = before ? db.events.filter((e) => e.at >= before) : [];
-        const removed = db.events.length - kept.length;
-        db.events = kept;
-        return removed;
+        const i = db.events.findIndex((e) => e.id === id);
+        if (i < 0) throw new ValidationError('Registro não encontrado (talvez já tenha sido excluído).');
+        db.events.splice(i, 1);
       });
     },
 

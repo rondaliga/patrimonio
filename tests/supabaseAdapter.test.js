@@ -162,17 +162,108 @@ test('tempo real: mudanças chegam descritas (ativo, evento, setor)', () => {
   assert.equal(got[1].tag, 'RAD-0001');
 });
 
-test('clearHistory chama a função do banco (com ou sem data) e devolve a quantidade', async () => {
-  const client = fakeClient({ rpcs: { clear_history: 12 } });
-  const api = createSupabaseAdapter(client);
-  assert.equal(api.capabilities.clearHistory, true);
-  assert.equal(await api.clearHistory(), 12);
-  assert.deepEqual(client.calls.at(-1), { rpc: 'clear_history', args: { p_before: null } });
-  await api.clearHistory({ before: '2026-01-01T00:00:00.000Z' });
-  assert.deepEqual(client.calls.at(-1).args, { p_before: '2026-01-01T00:00:00.000Z' });
+test('deleteEvent chama a função do banco e avisa quando nada foi excluído', async () => {
+  const client = fakeClient({ rpcs: { delete_event: 1 } });
+  await createSupabaseAdapter(client).deleteEvent(42);
+  assert.deepEqual(client.calls.at(-1), { rpc: 'delete_event', args: { p_id: 42 } });
+  await assert.rejects(createSupabaseAdapter(fakeClient({ rpcs: { delete_event: 0 } })).deleteEvent(7), ValidationError);
 });
 
-test('clearHistory sem permissão vira ValidationError', async () => {
-  const client = fakeClient({ errors: { clear_history: { code: '42501', message: 'Sem permissão para esta operação.' } } });
-  await assert.rejects(createSupabaseAdapter(client).clearHistory(), (e) => e instanceof ValidationError && /permissão/.test(e.message));
+test('deleteEvent sem permissão ou sem a função no banco: mensagens claras', async () => {
+  const semPermissao = fakeClient({ errors: { delete_event: { code: '42501', message: 'Sem permissão para esta operação.' } } });
+  await assert.rejects(createSupabaseAdapter(semPermissao).deleteEvent(1), /permissão/);
+  const semFuncao = fakeClient({ errors: { delete_event: { code: 'PGRST202', message: 'Could not find the function public.delete_event(p_id) in the schema cache' } } });
+  await assert.rejects(createSupabaseAdapter(semFuncao).deleteEvent(1), /schema\.sql/);
+});
+
+// ---- Login por usuário e gestão de contas ----
+function fakeAuthClient(over = {}) {
+  const calls = [];
+  const client = fakeClient(over.client);
+  client.auth = {
+    getSession: async () => ({ data: { session: over.session === undefined ? { user: { id: 'u1', email: 'ana@patrimonio.invalid' } } : over.session }, error: null }),
+    signInWithPassword: async (args) => {
+      calls.push(['signIn', args]);
+      return over.signIn ? over.signIn(args) : { data: { session: { user: { id: 'u1' } } }, error: null };
+    },
+    updateUser: async (args) => {
+      calls.push(['updateUser', args]);
+      return over.updateUser ? over.updateUser(args) : { data: {}, error: null };
+    },
+  };
+  return { client, calls };
+}
+
+test('signIn converte usuário em e-mail interno e traduz erro de credenciais', async () => {
+  const { client, calls } = fakeAuthClient({ signIn: () => ({ data: null, error: { message: 'Invalid login credentials' } }) });
+  const api = createSupabaseAdapter(client);
+  await assert.rejects(() => api.auth.signIn('  Ana.Silva ', 'x'), { message: 'Usuário ou senha incorretos.' });
+  assert.equal(calls[0][1].email, 'ana.silva@patrimonio.invalid');
+  const ok = fakeAuthClient();
+  await createSupabaseAdapter(ok.client).auth.signIn('antigo@gmail.com', 'senha1234');
+  assert.equal(ok.calls[0][1].email, 'antigo@gmail.com', 'e-mail de conta antiga continua funcionando');
+});
+
+test('getProfile devolve nome, perfil e usuário', async () => {
+  const { client } = fakeAuthClient({ client: { tables: { profiles: [{ full_name: 'Ana', role: 'admin', username: 'ana' }] } } });
+  assert.deepEqual(await createSupabaseAdapter(client).auth.getProfile('u1'), { fullName: 'Ana', role: 'admin', username: 'ana' });
+});
+
+test('changePassword confere a senha atual antes de trocar', async () => {
+  const good = fakeAuthClient();
+  await createSupabaseAdapter(good.client).auth.changePassword('atual123', 'nova12345');
+  assert.deepEqual(good.calls.map((c) => c[0]), ['signIn', 'updateUser']);
+  assert.deepEqual(good.calls[0][1], { email: 'ana@patrimonio.invalid', password: 'atual123' });
+  assert.deepEqual(good.calls[1][1], { password: 'nova12345' });
+
+  const wrong = fakeAuthClient({ signIn: () => ({ data: null, error: { message: 'Invalid login credentials' } }) });
+  await assert.rejects(() => createSupabaseAdapter(wrong.client).auth.changePassword('errada', 'nova12345'), (e) => e.fields.current && /atual/.test(e.message));
+  assert.ok(!wrong.calls.some((c) => c[0] === 'updateUser'), 'senha errada não chega a trocar');
+
+  const same = fakeAuthClient({ updateUser: () => ({ data: null, error: { message: 'New password should be different from the old password.' } }) });
+  await assert.rejects(() => createSupabaseAdapter(same.client).auth.changePassword('a', 'b'), (e) => !!e.fields.password);
+
+  const out = fakeAuthClient({ session: null });
+  await assert.rejects(() => createSupabaseAdapter(out.client).auth.changePassword('a', 'b'), /Sessão expirada/);
+});
+
+test('users: chama as funções admin_* e converte as linhas', async () => {
+  const client = fakeClient({
+    rpcs: {
+      admin_list_users: [{ id: 'u1', username: 'ana', full_name: 'Ana Lima', role: 'admin', created_at: '2026-10-01T10:00:00Z', last_sign_in_at: null }],
+      admin_create_user: { id: 'u2', username: 'bia', full_name: 'Bia', role: 'consulta' },
+      admin_update_user: { id: 'u2', username: 'bia', full_name: 'Bia Dias', role: 'tecnico' },
+    },
+  });
+  const api = createSupabaseAdapter(client);
+  assert.equal(api.capabilities.users, true);
+  assert.deepEqual(await api.users.list(), [{ id: 'u1', username: 'ana', fullName: 'Ana Lima', role: 'admin', createdAt: '2026-10-01T10:00:00.000Z', lastSignInAt: null }]);
+  const created = await api.users.create({ username: 'bia', fullName: 'Bia', role: 'consulta', password: 'senha1234' });
+  assert.equal(created.username, 'bia');
+  assert.deepEqual(client.calls.find((c) => c.rpc === 'admin_create_user').args, { p_username: 'bia', p_full_name: 'Bia', p_role: 'consulta', p_password: 'senha1234' });
+  assert.equal((await api.users.update('u2', { fullName: 'Bia Dias', role: 'tecnico' })).role, 'tecnico');
+  assert.deepEqual(client.calls.find((c) => c.rpc === 'admin_update_user').args, { p_id: 'u2', p_full_name: 'Bia Dias', p_role: 'tecnico' });
+  await api.users.setPassword('u2', 'outra12345');
+  assert.deepEqual(client.calls.find((c) => c.rpc === 'admin_set_password').args, { p_id: 'u2', p_password: 'outra12345' });
+  await api.users.remove('u2');
+  assert.deepEqual(client.calls.find((c) => c.rpc === 'admin_delete_user').args, { p_id: 'u2' });
+});
+
+test('erros de usuário vêm com o campo certo', async () => {
+  const dup = toValidationError({ code: 'P0001', message: 'Já existe um usuário com este nome de usuário.' });
+  assert.ok(dup.fields.username);
+  assert.ok(toValidationError({ code: '23505', message: 'duplicate key value violates unique constraint "profiles_username_unique"' }).fields.username);
+  assert.ok(toValidationError({ message: 'A senha deve ter pelo menos 8 caracteres.' }).fields.password);
+  assert.ok(toValidationError({ message: 'Informe o nome completo da pessoa.' }).fields.fullName);
+  assert.ok(toValidationError({ message: 'Nome de usuário inválido: use de 3 a 30 letras' }).fields.username);
+  assert.match(toValidationError({ code: '42501', message: 'Sem permissão para esta operação.' }).message, /permissão/);
+  const client = fakeClient({ errors: { admin_delete_user: { code: 'P0001', message: 'Você não pode excluir a sua própria conta.' } } });
+  await assert.rejects(() => createSupabaseAdapter(client).users.remove('eu'), /própria conta/);
+});
+
+test('o modo local não tem gestão de usuários', async () => {
+  const { createLocalAdapter } = await import('../src/services/localAdapter.js');
+  const api = createLocalAdapter();
+  assert.equal(api.users, undefined);
+  assert.ok(!api.capabilities.users);
 });

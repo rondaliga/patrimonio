@@ -8,6 +8,7 @@ export const loaders = {
   movement: () => import('../pages/MovementPage.jsx'),
   maintenance: () => import('../pages/MaintenancePage.jsx'),
   reports: () => import('../pages/ReportsPage.jsx'),
+  users: () => import('../pages/UsersPage.jsx'),
   settings: () => import('../pages/SettingsPage.jsx'),
 };
 
@@ -18,6 +19,7 @@ const BY_PATH = {
   '/movimentacao': 'movement',
   '/manutencao': 'maintenance',
   '/relatorios': 'reports',
+  '/usuarios': 'users',
   '/config': 'settings',
 };
 

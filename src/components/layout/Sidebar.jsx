@@ -6,6 +6,7 @@ import {
   Wrench,
   ClipboardList,
   Settings,
+  UserCog,
   HeartPulse,
   X,
 } from 'lucide-react';
@@ -19,12 +20,13 @@ export const NAV = [
   { to: '/movimentacao', label: 'Retirada / Devolução', icon: ArrowLeftRight },
   { to: '/manutencao', label: 'Manutenção', icon: Wrench, badge: 'maintenance' },
   { to: '/relatorios', label: 'Relatórios', icon: ClipboardList },
+  { to: '/usuarios', label: 'Usuários', icon: UserCog, adminOnly: true },
   { to: '/config', label: 'Configurações', icon: Settings },
 ];
 
 const isActive = (path, to) => (to === '/' ? path === '/' : path === to || path.startsWith(`${to}/`));
 
-export default function Sidebar({ path, open, onClose, counts }) {
+export default function Sidebar({ path, open, onClose, counts, showUsers = false }) {
   return (
     <>
       {open && <div className="fixed inset-0 z-30 bg-slate-900/50 md:hidden" onClick={onClose} aria-hidden="true" />}
@@ -45,7 +47,7 @@ export default function Sidebar({ path, open, onClose, counts }) {
           </button>
         </div>
         <nav className="mt-2 flex-1 space-y-0.5 overflow-y-auto px-2">
-          {NAV.map(({ to, label, icon: Icon, badge }) => {
+          {NAV.filter((n) => !n.adminOnly || showUsers).map(({ to, label, icon: Icon, badge }) => {
             const active = isActive(path, to);
             const count = badge ? counts?.[badge] : 0;
             return (

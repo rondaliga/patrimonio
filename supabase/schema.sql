@@ -5,6 +5,7 @@
 --   * Antes de rodar, vá até o FINAL do arquivo e troque SEU@EMAIL.COM pelo e-mail do
 --     usuário que você criou em Authentication → Users (ele vira administrador).
 --     Se o usuário ainda não existe, rode assim mesmo, crie o usuário e rode de novo.
+--     (Depois da 1ª execução o login passa a ser por NOME DE USUÁRIO; veja a mensagem "OK: ... agora entra com...".)
 --
 -- Modelo de segurança:
 --   * Todos precisam estar logados (role "authenticated"); "anon" não acessa nada.
@@ -28,6 +29,14 @@ create table if not exists public.profiles (
   role      text not null default 'consulta'
             check (role in ('admin', 'tecnico', 'enfermagem', 'consulta'))
 );
+
+-- nome de usuário usado no login (o Supabase Auth exige um e-mail; o app usa "usuario@patrimonio.invalid" por baixo)
+alter table public.profiles add column if not exists username text;
+create unique index if not exists profiles_username_unique on public.profiles (lower(username));
+do $$ begin
+  alter table public.profiles add constraint profiles_username_format
+    check (username is null or username ~ '^[a-z0-9][a-z0-9._-]{2,29}$');
+exception when duplicate_object then null; end $$;
 
 create table if not exists public.assets (
   tag      text primary key check (tag ~ '^[A-Z0-9][A-Z0-9-]{2,19}$'),
@@ -303,19 +312,181 @@ begin
 end
 $$;
 
--- Apagar o histórico de movimentações (só administrador). Sem argumento apaga tudo;
--- com p_before apaga apenas os eventos anteriores a essa data. Os ativos não são alterados.
+-- Excluir UM registro do histórico (só administrador). O ativo e a situação atual dele não mudam.
 -- O front-end não tem DELETE direto na tabela de eventos: só esta função (que confere o papel).
-create or replace function public.clear_history(p_before timestamptz default null)
+create or replace function public.delete_event(p_id bigint)
 returns bigint
 language plpgsql security definer set search_path = public as
 $$
 declare n bigint;
 begin
   perform public._require_role('admin');
-  delete from public.events where p_before is null or at < p_before;
+  delete from public.events where id = p_id;
   get diagnostics n = row_count;
   return n;
+end
+$$;
+
+-- ---------- Gestão de usuários (só administrador) ----------
+-- O front-end usa a chave pública (anon): ela não pode criar contas no Supabase Auth.
+-- Por isso estas funções (security definer, conferem o papel 'admin') criam/alteram contas direto em auth.users.
+-- O login é por NOME DE USUÁRIO: internamente a conta recebe o e-mail "usuario@patrimonio.invalid"
+-- (domínio reservado, nunca recebe mensagens) e o app faz essa conversão sozinho.
+
+create or replace function public._login_email(p_username text) returns text
+language sql immutable as $$ select lower(btrim(p_username)) || '@patrimonio.invalid' $$;
+
+create or replace function public._clean_username(p text) returns text
+language plpgsql immutable as
+$$
+declare u text := lower(btrim(coalesce(p, '')));
+begin
+  if u !~ '^[a-z0-9][a-z0-9._-]{2,29}$' then
+    raise exception 'Nome de usuário inválido: use de 3 a 30 letras minúsculas, números, ponto, hífen ou sublinhado.';
+  end if;
+  return u;
+end
+$$;
+
+create or replace function public._check_password(p text) returns void
+language plpgsql immutable as
+$$
+begin
+  if length(coalesce(p, '')) < 8 then
+    raise exception 'A senha deve ter pelo menos 8 caracteres.';
+  end if;
+  if length(p) > 72 then
+    raise exception 'A senha deve ter no máximo 72 caracteres.';
+  end if;
+end
+$$;
+
+create or replace function public.admin_list_users()
+returns table (id uuid, username text, full_name text, role text, created_at timestamptz, last_sign_in_at timestamptz)
+language plpgsql stable security definer set search_path = public as
+$$
+begin
+  perform public._require_role('admin');
+  return query
+    select p.id, p.username, p.full_name, p.role, u.created_at, u.last_sign_in_at
+      from public.profiles p
+      join auth.users u on u.id = p.id
+     order by lower(coalesce(nullif(p.full_name, ''), p.username, '')), p.id;
+end
+$$;
+
+create or replace function public.admin_create_user(p_username text, p_full_name text, p_role text, p_password text)
+returns public.profiles
+language plpgsql security definer set search_path = public, extensions as
+$$
+declare
+  v_user  text := public._clean_username(p_username);
+  v_name  text := btrim(coalesce(p_full_name, ''));
+  v_email text := public._login_email(v_user);
+  v_id    uuid := gen_random_uuid();
+  v_col   text;
+  r       public.profiles;
+begin
+  perform public._require_role('admin');
+  if length(v_name) < 2 then
+    raise exception 'Informe o nome completo da pessoa.';
+  end if;
+  if p_role is null or p_role not in ('admin', 'tecnico', 'enfermagem', 'consulta') then
+    raise exception 'Perfil de acesso inválido.';
+  end if;
+  perform public._check_password(p_password);
+  if exists (select 1 from public.profiles where lower(username) = v_user)
+     or exists (select 1 from auth.users where lower(email) = v_email) then
+    raise exception 'Já existe um usuário com este nome de usuário.';
+  end if;
+
+  insert into auth.users (
+    instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+    raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+  ) values (
+    '00000000-0000-0000-0000-000000000000', v_id, 'authenticated', 'authenticated', v_email,
+    crypt(p_password, gen_salt('bf')), now(),
+    '{"provider":"email","providers":["email"]}'::jsonb, jsonb_build_object('full_name', v_name), now(), now()
+  );
+  -- o GoTrue falha ao ler colunas de token nulas: garante texto vazio nas que existirem nesta versão
+  for v_col in
+    select column_name from information_schema.columns
+     where table_schema = 'auth' and table_name = 'users'
+       and column_name in ('confirmation_token', 'recovery_token', 'email_change_token_new', 'email_change',
+                           'email_change_token_current', 'phone_change', 'phone_change_token', 'reauthentication_token')
+  loop
+    execute format('update auth.users set %I = coalesce(%I, '''') where id = $1', v_col, v_col) using v_id;
+  end loop;
+  insert into auth.identities (id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at)
+  values (v_id, v_id, jsonb_build_object('sub', v_id::text, 'email', v_email, 'email_verified', true),
+          'email', v_id::text, now(), now(), now());
+
+  -- o gatilho on_auth_user_created já criou o perfil: completa os dados
+  insert into public.profiles (id, full_name, role, username) values (v_id, v_name, p_role, v_user)
+  on conflict (id) do update set full_name = excluded.full_name, role = excluded.role, username = excluded.username
+  returning * into r;
+  return r;
+end
+$$;
+
+create or replace function public.admin_update_user(p_id uuid, p_full_name text, p_role text)
+returns public.profiles
+language plpgsql security definer set search_path = public as
+$$
+declare
+  v_name text := btrim(coalesce(p_full_name, ''));
+  r public.profiles;
+begin
+  perform public._require_role('admin');
+  if length(v_name) < 2 then
+    raise exception 'Informe o nome completo da pessoa.';
+  end if;
+  if p_role is null or p_role not in ('admin', 'tecnico', 'enfermagem', 'consulta') then
+    raise exception 'Perfil de acesso inválido.';
+  end if;
+  if p_id = auth.uid() and p_role <> 'admin' then
+    raise exception 'Você não pode tirar o seu próprio acesso de administrador.';
+  end if;
+  update public.profiles set full_name = v_name, role = p_role where id = p_id returning * into r;
+  if not found then
+    raise exception 'Usuário não encontrado.';
+  end if;
+  return r;
+end
+$$;
+
+-- Redefine a senha de OUTRA pessoa (a própria senha cada um troca em "Alterar minha senha").
+create or replace function public.admin_set_password(p_id uuid, p_password text)
+returns void
+language plpgsql security definer set search_path = public, extensions as
+$$
+begin
+  perform public._require_role('admin');
+  perform public._check_password(p_password);
+  update auth.users set encrypted_password = crypt(p_password, gen_salt('bf')), updated_at = now() where id = p_id;
+  if not found then
+    raise exception 'Usuário não encontrado.';
+  end if;
+  -- encerra as sessões abertas da pessoa: ela entra de novo com a senha nova
+  if p_id <> auth.uid() and to_regclass('auth.sessions') is not null then
+    execute 'delete from auth.sessions where user_id = $1' using p_id;
+  end if;
+end
+$$;
+
+create or replace function public.admin_delete_user(p_id uuid)
+returns void
+language plpgsql security definer set search_path = public as
+$$
+begin
+  perform public._require_role('admin');
+  if p_id = auth.uid() then
+    raise exception 'Você não pode excluir a sua própria conta.';
+  end if;
+  delete from auth.users where id = p_id;   -- o perfil some junto (on delete cascade)
+  if not found then
+    raise exception 'Usuário não encontrado.';
+  end if;
 end
 $$;
 
@@ -340,7 +511,12 @@ grant execute on function public.checkin_asset(text, text, text)            to a
 grant execute on function public.send_to_maintenance(text, text, text)      to authenticated;
 grant execute on function public.complete_maintenance(text, text)           to authenticated;
 grant execute on function public.retire_asset(text, text)                   to authenticated;
-grant execute on function public.clear_history(timestamptz)                 to authenticated;
+grant execute on function public.delete_event(bigint)                       to authenticated;
+grant execute on function public.admin_list_users()                          to authenticated;
+grant execute on function public.admin_create_user(text, text, text, text)   to authenticated;
+grant execute on function public.admin_update_user(uuid, text, text)         to authenticated;
+grant execute on function public.admin_set_password(uuid, text)              to authenticated;
+grant execute on function public.admin_delete_user(uuid)                     to authenticated;
 
 -- ---------- Row Level Security ----------
 
@@ -398,11 +574,13 @@ insert into public.sectors (id, name) values
 on conflict do nothing;
 
 -- ---------- Administrador ----------
--- >>> TROQUE O E-MAIL ABAIXO pelo do seu usuário (mantenha as aspas simples) <<<
+-- >>> Aqui vai o NOME DE USUÁRIO (ou o e-mail antigo) de quem deve ser administrador <<<
+-- Depois da primeira execução este bloco só reaplica o papel de administrador a essa pessoa.
+-- Para criar e administrar os demais usuários, use a tela "Usuários" do app.
 
 do $$
 declare
-  v_email text := 'rauancostadev@gmail.com';
+  v_login text := 'rauancostadev@gmail.com';
   v_id    uuid;
 begin
   -- usuários criados antes deste script ganham perfil
@@ -410,17 +588,61 @@ begin
   select id from auth.users
   on conflict (id) do nothing;
 
-  if v_email = 'SEU@EMAIL.COM' then
-    raise notice 'ATENÇÃO: nenhum administrador definido. Troque SEU@EMAIL.COM pelo seu e-mail e rode de novo.';
+  if v_login = 'SEU@EMAIL.COM' then
+    raise notice 'ATENÇÃO: nenhum administrador definido. Troque SEU@EMAIL.COM pelo seu usuário (ou e-mail) e rode de novo.';
     return;
   end if;
-  select id into v_id from auth.users where lower(email) = lower(btrim(v_email));
+  select u.id into v_id
+    from auth.users u join public.profiles p on p.id = u.id
+   where lower(u.email) = lower(btrim(v_login))
+      or lower(p.username) = lower(btrim(v_login))
+      or lower(u.raw_user_meta_data ->> 'email_original') = lower(btrim(v_login))
+   limit 1;
   if v_id is null then
-    raise notice 'ATENÇÃO: o usuário % ainda não existe. Crie-o em Authentication → Users e rode este arquivo de novo.', v_email;
+    raise notice 'ATENÇÃO: o usuário % ainda não existe. Crie-o em Authentication → Users e rode este arquivo de novo.', v_login;
   else
     update public.profiles set role = 'admin' where id = v_id;
-    raise notice 'OK: % agora é administrador.', v_email;
+    raise notice 'OK: % agora é administrador.', v_login;
   end if;
+end $$;
+
+-- ---------- Nomes de usuário (login sem e-mail) ----------
+-- Contas que já existiam recebem um nome de usuário (a parte do e-mail antes do @) e passam a
+-- entrar por ele, com a MESMA senha. Roda uma vez por conta; o e-mail original fica guardado nos
+-- metadados. Contas novas criadas pela tela "Usuários" já nascem assim.
+do $$
+declare
+  r record;
+  base text; cand text; n int; v_email text;
+begin
+  for r in
+    select p.id, u.email
+      from public.profiles p join auth.users u on u.id = p.id
+     where p.username is null
+     order by u.created_at, u.id
+  loop
+    base := regexp_replace(lower(split_part(coalesce(r.email, ''), '@', 1)), '[^a-z0-9._-]', '', 'g');
+    base := left(regexp_replace(base, '^[^a-z0-9]+', ''), 26);
+    if length(base) < 3 then base := 'usuario'; end if;
+    cand := base; n := 1;
+    while exists (select 1 from public.profiles where lower(username) = cand) loop
+      n := n + 1; cand := base || n;
+    end loop;
+
+    update public.profiles set username = cand where id = r.id;
+    v_email := public._login_email(cand);
+    if lower(coalesce(r.email, '')) <> v_email then
+      update auth.users
+         set email = v_email,
+             raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) || jsonb_build_object('email_original', r.email),
+             updated_at = now()
+       where id = r.id;
+      update auth.identities
+         set identity_data = jsonb_set(identity_data, '{email}', to_jsonb(v_email))
+       where user_id = r.id and provider = 'email';
+    end if;
+    raise notice 'OK: % agora entra com o nome de usuário "%" (a senha continua a mesma).', coalesce(r.email, r.id::text), cand;
+  end loop;
 end $$;
 
 -- Tempo real no front-end (idempotente; só age se a publicação do Supabase existir)

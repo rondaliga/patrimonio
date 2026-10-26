@@ -13,15 +13,16 @@ const SectorsPage = lazy(loaders.sectors);
 const MovementPage = lazy(loaders.movement);
 const MaintenancePage = lazy(loaders.maintenance);
 const ReportsPage = lazy(loaders.reports);
+const UsersPage = lazy(loaders.users);
 const SettingsPage = lazy(loaders.settings);
 
 function PageSkeleton() {
   return (
     <div className="space-y-4" aria-busy="true" aria-label="Carregando página">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[0, 1, 2, 3].map((i) => <div key={i} className="card h-24 animate-pulse bg-slate-50" />)}
+        {[0, 1, 2, 3].map((i) => <div key={i} className="card h-24 animate-pulse bg-slate-50 dark:bg-slate-800/50" />)}
       </div>
-      <div className="card h-64 animate-pulse bg-slate-50" />
+      <div className="card h-64 animate-pulse bg-slate-50 dark:bg-slate-800/50" />
     </div>
   );
 }
@@ -33,6 +34,7 @@ const TITLES = {
   '/movimentacao': 'Retirada / Devolução',
   '/manutencao': 'Manutenção e Esterilização',
   '/relatorios': 'Relatórios',
+  '/usuarios': 'Usuários',
   '/config': 'Configurações',
 };
 
@@ -55,14 +57,16 @@ function resolve(path, query) {
       return { title: TITLES['/manutencao'], element: <MaintenancePage query={query} /> };
     case '/relatorios':
       return { title: TITLES['/relatorios'], element: <ReportsPage /> };
+    case '/usuarios':
+      return { title: TITLES['/usuarios'], element: <UsersPage /> };
     case '/config':
       return { title: TITLES['/config'], element: <SettingsPage /> };
     default:
       return {
         title: 'Página não encontrada',
         element: (
-          <div className="card p-10 text-center text-sm text-slate-500">
-            Página não encontrada. <a className="text-brand-600 underline" href="#/">Voltar ao painel</a>
+          <div className="card p-10 text-center text-sm text-slate-500 dark:text-slate-400">
+            Página não encontrada. <a className="text-brand-600 dark:text-sky-300 underline" href="#/">Voltar ao painel</a>
           </div>
         ),
       };
@@ -71,7 +75,7 @@ function resolve(path, query) {
 
 export default function App() {
   const { path, query } = useHashRoute();
-  const { data } = useData();
+  const { data, can, users } = useData();
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => preloadAllWhenIdle(), []);
@@ -90,7 +94,7 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar path={path} open={menuOpen} onClose={() => setMenuOpen(false)} counts={counts} />
+      <Sidebar path={path} open={menuOpen} onClose={() => setMenuOpen(false)} counts={counts} showUsers={!!users && can('user.manage')} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Header title={title} onMenu={() => setMenuOpen(true)} hideSearch={path === '/ativos'} />
         <main className="flex-1 p-4 sm:p-6">

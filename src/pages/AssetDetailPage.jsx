@@ -4,6 +4,7 @@ import { useData } from '../context/DataContext.jsx';
 import StatusBadge from '../components/ui/StatusBadge.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import ConfirmModal from '../components/ui/ConfirmModal.jsx';
+import DeleteEventButton from '../components/ui/DeleteEventButton.jsx';
 import { EVENT_STYLES } from '../components/dashboard/RecentActivity.jsx';
 import AssetFormModal from '../components/forms/AssetFormModal.jsx';
 import CheckOutForm from '../components/forms/CheckOutForm.jsx';
@@ -19,8 +20,8 @@ import { navigate } from '../router/hashRouter.js';
 function Info({ label, children }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-0.5 text-sm text-slate-800">{children || '—'}</dd>
+      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</dt>
+      <dd className="mt-0.5 text-sm text-slate-800 dark:text-slate-100">{children || '—'}</dd>
     </div>
   );
 }
@@ -47,9 +48,9 @@ export default function AssetDetailPage({ tag }) {
 
   if (!asset) {
     return (
-      <div className="card p-10 text-center text-sm text-slate-500">
+      <div className="card p-10 text-center text-sm text-slate-500 dark:text-slate-400">
         Ativo <strong>{tag}</strong> não encontrado.{' '}
-        <a className="text-brand-600 underline" href="#/ativos">Voltar para a lista</a>
+        <a className="text-brand-600 dark:text-sky-300 underline" href="#/ativos">Voltar para a lista</a>
       </div>
     );
   }
@@ -60,15 +61,15 @@ export default function AssetDetailPage({ tag }) {
 
   return (
     <div className="space-y-4">
-      <a href="#/ativos" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700">
+      <a href="#/ativos" className="inline-flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400 hover:text-brand-700 dark:hover:text-sky-200">
         <ArrowLeft className="h-4 w-4" /> Voltar para ativos
       </a>
 
       <div className="card">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-4 py-4">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 dark:border-slate-800 px-4 py-4">
           <div>
-            <p className="font-mono text-sm font-semibold text-brand-700">{asset.tag}</p>
-            <h2 className="text-xl font-semibold text-slate-800">{asset.name}</h2>
+            <p className="font-mono text-sm font-semibold text-brand-700 dark:text-sky-300">{asset.tag}</p>
+            <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">{asset.name}</h2>
             <div className="mt-2"><StatusBadge status={s} /></div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -91,26 +92,26 @@ export default function AssetDetailPage({ tag }) {
               <button className="btn btn-secondary" onClick={() => setModal('edit')}><Pencil className="h-4 w-4" /> Editar</button>
             )}
             {deletable && can('asset.delete') && (
-              <button className="btn btn-secondary text-red-600" onClick={() => setModal('delete')}><Trash2 className="h-4 w-4" /> Excluir</button>
+              <button className="btn btn-secondary text-red-600 dark:text-red-400" onClick={() => setModal('delete')}><Trash2 className="h-4 w-4" /> Excluir</button>
             )}
           </div>
         </div>
 
         {s === 'in_use' && asset.assignedTo && (
-          <div className="border-b border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+          <div className="border-b border-sky-100 dark:border-sky-900/60 bg-sky-50 dark:bg-sky-950/40 px-4 py-3 text-sm text-sky-900 dark:text-sky-100">
             Com <strong>{asset.assignedTo.user}</strong> em <strong>{sectorName(asset.assignedTo.sectorId)}</strong> desde{' '}
             {fmtDateTime(asset.assignedTo.since)} (há {fmtDuration(asset.assignedTo.since)}).
-            {asset.assignedTo.note && <span className="text-sky-700"> Obs.: {asset.assignedTo.note}</span>}
+            {asset.assignedTo.note && <span className="text-sky-700 dark:text-sky-300"> Obs.: {asset.assignedTo.note}</span>}
           </div>
         )}
         {s === 'maintenance' && asset.maintenance && (
-          <div className="border-b border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <div className="border-b border-amber-100 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
             {MAINTENANCE_KINDS[asset.maintenance.kind]} desde {fmtDateTime(asset.maintenance.since)} (há {fmtDuration(asset.maintenance.since)}):{' '}
             {asset.maintenance.reason}
           </div>
         )}
         {s === 'retired' && asset.retired && (
-          <div className="border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-900">
+          <div className="border-b border-red-100 dark:border-red-900/60 bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-900 dark:text-red-100">
             Baixado em {fmtDate(asset.retired.at)}: {asset.retired.reason}
           </div>
         )}
@@ -131,9 +132,9 @@ export default function AssetDetailPage({ tag }) {
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">Histórico de movimentações</h2>
-          <span className="text-xs text-slate-500">{history.length} {history.length === 1 ? 'registro' : 'registros'}</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400">{history.length} {history.length === 1 ? 'registro' : 'registros'}</span>
         </div>
-        <ul className="divide-y divide-slate-100">
+        <ul className="divide-y divide-slate-100 dark:divide-slate-800">
           {history.map((e) => {
             const { icon: Icon, color } = EVENT_STYLES[e.type] ?? EVENT_STYLES.edited;
             return (
@@ -141,13 +142,18 @@ export default function AssetDetailPage({ tag }) {
                 <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${color}`}>
                   <Icon className="h-3.5 w-3.5" />
                 </span>
-                <div className="min-w-0">
-                  <p className="text-sm text-slate-700">{describeEvent(e, e.sectorId ? sectorName(e.sectorId) : '')}</p>
-                  <p className="text-xs text-slate-500">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-slate-700 dark:text-slate-200">{describeEvent(e, e.sectorId ? sectorName(e.sectorId) : '')}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     {fmtDateTime(e.at)}
                     {e.note ? ` · ${e.note}` : ''}
                   </p>
                 </div>
+                <DeleteEventButton
+                  id={e.id}
+                  label={describeEvent(e, e.sectorId ? sectorName(e.sectorId) : '')}
+                  onDeleted={(id) => setFull((f) => f && f.filter((x) => x.id !== id))}
+                />
               </li>
             );
           })}

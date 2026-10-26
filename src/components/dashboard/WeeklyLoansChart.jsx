@@ -16,17 +16,17 @@ export default function WeeklyLoansChart({ data, className = '' }) {
             <div key={`${d.day}-${i}`} className="flex flex-1 flex-col items-center gap-1">
               <div className="relative w-full flex-1" title={`${d.day}: ${d.value}`}>
                 <span
-                  className="absolute inset-x-0 text-center text-[11px] font-medium text-slate-500"
+                  className="absolute inset-x-0 text-center text-[11px] font-medium text-slate-500 dark:text-slate-400"
                   style={{ bottom: `calc(${pct}% + 2px)` }}
                 >
                   {d.value}
                 </span>
                 <div
-                  className={`absolute inset-x-0 bottom-0 rounded-t ${isToday ? 'bg-brand-600' : 'bg-brand-100'}`}
+                  className={`absolute inset-x-0 bottom-0 rounded-t ${isToday ? 'bg-brand-600' : 'bg-brand-100 dark:bg-brand-700/60'}`}
                   style={{ height: `${pct}%` }}
                 />
               </div>
-              <span className={`text-[11px] ${isToday ? 'font-semibold text-brand-700' : 'text-slate-500'}`}>
+              <span className={`text-[11px] ${isToday ? 'font-semibold text-brand-700 dark:text-sky-300' : 'text-slate-500 dark:text-slate-400'}`}>
                 {d.day}
               </span>
             </div>

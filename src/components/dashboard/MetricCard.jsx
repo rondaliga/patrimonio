@@ -1,6 +1,6 @@
 // Card de métrica no estilo "caixas coloridas" do Snipe-IT. Com `href`, vira um atalho clicável.
 const TONES = {
-  slate: 'bg-slate-700',
+  slate: 'bg-slate-700 dark:bg-slate-500',
   green: 'bg-emerald-500',
   blue: 'bg-sky-500',
   amber: 'bg-amber-500',
@@ -18,9 +18,9 @@ export default function MetricCard({ label, value, hint, icon: Icon, tone = 'sla
         <Icon className="h-7 w-7" />
       </div>
       <div className="flex-1 px-4 py-3">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
-        <p className="text-2xl font-bold text-slate-800">{value}</p>
-        {hint && <p className="text-xs text-slate-500">{hint}</p>}
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</p>
+        <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{value}</p>
+        {hint && <p className="text-xs text-slate-500 dark:text-slate-400">{hint}</p>}
       </div>
     </Wrapper>
   );

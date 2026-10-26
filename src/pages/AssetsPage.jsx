@@ -106,7 +106,7 @@ export default function AssetsPage({ query }) {
           <h2 className="card-title">
             {rows.length} {rows.length === 1 ? 'ativo' : 'ativos'}
             {hasFilters && (
-              <a href="#/ativos" className="ml-3 text-xs font-normal text-brand-600 hover:underline">limpar filtros</a>
+              <a href="#/ativos" className="ml-3 text-xs font-normal text-brand-600 dark:text-sky-300 hover:underline">limpar filtros</a>
             )}
           </h2>
           <div className="flex gap-2">
@@ -123,7 +123,7 @@ export default function AssetsPage({ query }) {
         ) : (
           <div className="overflow-x-auto">
             <table className="table-dense w-full">
-              <thead className="bg-slate-50">
+              <thead className="bg-slate-50 dark:bg-slate-800/50">
                 <tr>
                   <th>Patrimônio</th>
                   <th>Ativo</th>
@@ -133,18 +133,18 @@ export default function AssetsPage({ query }) {
                   <th className="hidden md:table-cell" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {slice.map((a) => (
-                  <tr key={a.tag} className="hover:bg-slate-50">
+                  <tr key={a.tag} className="hover:bg-slate-50 dark:hover:bg-slate-800">
                     <td>
-                      <a href={`#/ativos/${encodeURIComponent(a.tag)}`} className="font-mono text-xs font-semibold text-brand-700 hover:underline">
+                      <a href={`#/ativos/${encodeURIComponent(a.tag)}`} className="font-mono text-xs font-semibold text-brand-700 dark:text-sky-300 hover:underline">
                         {a.tag}
                       </a>
                     </td>
                     <td>
                       {a.name}
-                      <span className="block text-[11px] text-slate-500">{CATEGORIES[a.category]}</span>
-                      <span className="block text-[11px] text-slate-500 md:hidden">
+                      <span className="block text-[11px] text-slate-500 dark:text-slate-400">{CATEGORIES[a.category]}</span>
+                      <span className="block text-[11px] text-slate-500 dark:text-slate-400 md:hidden">
                         {a.assignedTo ? `${a.assignedTo.user} · ${sectorName(a.assignedTo.sectorId)}` : sectorName(a.sectorId)}
                       </span>
                       <span className="mt-1 block md:hidden"><StatusBadge status={a.status} /></span>
@@ -154,10 +154,10 @@ export default function AssetsPage({ query }) {
                       {a.assignedTo ? (
                         <>
                           {a.assignedTo.user}
-                          <span className="block text-[11px] text-slate-500">{sectorName(a.assignedTo.sectorId)}</span>
+                          <span className="block text-[11px] text-slate-500 dark:text-slate-400">{sectorName(a.assignedTo.sectorId)}</span>
                         </>
                       ) : (
-                        <span className="text-slate-500">{sectorName(a.sectorId)}</span>
+                        <span className="text-slate-500 dark:text-slate-400">{sectorName(a.sectorId)}</span>
                       )}
                     </td>
                     <td className="hidden md:table-cell"><StatusBadge status={a.status} /></td>
@@ -172,7 +172,7 @@ export default function AssetsPage({ query }) {
         )}
 
         {pages > 1 && (
-          <div className="flex items-center justify-between border-t border-slate-100 px-4 py-2 text-sm text-slate-500">
+          <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 px-4 py-2 text-sm text-slate-500 dark:text-slate-400">
             <span>Página {current} de {pages}</span>
             <div className="flex gap-1">
               <button className="btn btn-secondary btn-sm" disabled={current <= 1} onClick={() => goPage(current - 1)} aria-label="Página anterior">

@@ -2,7 +2,8 @@
 // Recebe o `client` do supabase-js (injetado, para poder ser testado com um falso).
 import { ValidationError, normalizeAssetInput } from './rules.js';
 import { slugify } from '../lib/format.js';
-import { ASSET_COLUMNS, EVENT_COLUMNS, assetToInsert, rowToAsset, rowToEvent, toValidationError } from './supabaseMapping.js';
+import { loginEmail } from '../lib/accounts.js';
+import { ASSET_COLUMNS, EVENT_COLUMNS, assetToInsert, rowToAsset, rowToEvent, rowToUser, toValidationError } from './supabaseMapping.js';
 
 const DB_VERSION = 1;
 const PAGE = 1000; // limite padrão do PostgREST por requisição
@@ -54,7 +55,7 @@ export function createSupabaseAdapter(client, { now = () => new Date() } = {}) {
     mode: 'supabase',
     persistent: true,
     // Operações em massa só existem no modo local
-    capabilities: { demo: false, import: false, clearHistory: true },
+    capabilities: { demo: false, import: false, users: true },
     snapshot,
 
     // ---- Ativos ----
@@ -137,9 +138,10 @@ export function createSupabaseAdapter(client, { now = () => new Date() } = {}) {
       const { sectors, assets, events } = await snapshot();
       return { app: 'patrimonio-hospitalar', version: DB_VERSION, exportedAt: new Date(now()).toISOString(), sectors, assets, events };
     },
-    // Só administradores (a função do banco confere o papel). Devolve quantos registros foram removidos.
-    async clearHistory({ before } = {}) {
-      return Number(await run(client.rpc('clear_history', { p_before: before ?? null }))) || 0;
+    // Exclui UM registro do histórico. Só administradores: a função do banco confere o papel.
+    async deleteEvent(id) {
+      const n = Number(await run(client.rpc('delete_event', { p_id: id }))) || 0;
+      if (!n) throw new ValidationError('Registro não encontrado (talvez já tenha sido excluído).');
     },
     importData: unavailable, // migração: scripts/backup-to-sql.mjs
     resetDemo: unavailable,
@@ -171,14 +173,38 @@ export function createSupabaseAdapter(client, { now = () => new Date() } = {}) {
         if (error) throw toValidationError(error);
         return data.session ?? null;
       },
-      async signIn(email, password) {
-        const { data, error } = await client.auth.signInWithPassword({ email: text(email).trim(), password: text(password) });
+      // `username` pode ser o nome de usuário (padrão) ou, em contas antigas, um e-mail.
+      async signIn(username, password) {
+        const { data, error } = await client.auth.signInWithPassword({ email: loginEmail(username), password: text(password) });
         if (error) {
           throw new ValidationError(
-            /invalid|credentials/i.test(error.message) ? 'E-mail ou senha incorretos.' : toValidationError(error).message
+            /invalid|credentials/i.test(error.message) ? 'Usuário ou senha incorretos.' : toValidationError(error).message
           );
         }
         return data.session;
+      },
+      // O próprio usuário troca a senha: confere a senha atual antes (quem está no teclado é o dono da conta).
+      async changePassword(currentPassword, newPassword) {
+        const { data: sess } = await client.auth.getSession();
+        const email = sess?.session?.user?.email;
+        if (!email) throw new ValidationError('Sessão expirada. Entre novamente.');
+        const check = await client.auth.signInWithPassword({ email, password: text(currentPassword) });
+        if (check.error) {
+          if (/invalid|credentials/i.test(check.error.message)) {
+            throw new ValidationError('A senha atual está incorreta.', { current: 'A senha atual está incorreta.' });
+          }
+          throw toValidationError(check.error);
+        }
+        const { error } = await client.auth.updateUser({ password: text(newPassword) });
+        if (error) {
+          if (/different from the old/i.test(error.message)) {
+            throw new ValidationError('A nova senha deve ser diferente da atual.', { password: 'A nova senha deve ser diferente da atual.' });
+          }
+          if (/at least|weak|short/i.test(error.message)) {
+            throw new ValidationError('A nova senha é fraca ou curta demais. Use pelo menos 8 caracteres.', { password: 'A nova senha é fraca ou curta demais. Use pelo menos 8 caracteres.' });
+          }
+          throw toValidationError(error);
+        }
       },
       async signOut() {
         await client.auth.signOut();
@@ -188,8 +214,31 @@ export function createSupabaseAdapter(client, { now = () => new Date() } = {}) {
         return () => data.subscription.unsubscribe();
       },
       async getProfile(userId) {
-        const row = await run(client.from('profiles').select('full_name, role').eq('id', userId).maybeSingle());
-        return { fullName: row?.full_name ?? '', role: row?.role ?? 'consulta' };
+        const row = await run(client.from('profiles').select('full_name, role, username').eq('id', userId).maybeSingle());
+        return { fullName: row?.full_name ?? '', role: row?.role ?? 'consulta', username: row?.username ?? '' };
+      },
+    },
+
+    // ---- Gestão de usuários (só administrador; o banco confere o papel em cada função admin_*) ----
+    users: {
+      async list() {
+        const rows = await run(client.rpc('admin_list_users'));
+        return (rows ?? []).map(rowToUser);
+      },
+      async create({ username, fullName, role, password }) {
+        const row = await run(
+          client.rpc('admin_create_user', { p_username: text(username), p_full_name: text(fullName), p_role: role, p_password: text(password) })
+        );
+        return rowToUser(row);
+      },
+      async update(id, { fullName, role }) {
+        return rowToUser(await run(client.rpc('admin_update_user', { p_id: id, p_full_name: text(fullName), p_role: role })));
+      },
+      async setPassword(id, password) {
+        await run(client.rpc('admin_set_password', { p_id: id, p_password: text(password) }));
+      },
+      async remove(id) {
+        await run(client.rpc('admin_delete_user', { p_id: id }));
       },
     },
   };

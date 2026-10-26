@@ -2,25 +2,25 @@
 export const STATUS = {
   available: {
     label: 'Disponível',
-    badge: 'bg-emerald-100 text-emerald-800 ring-emerald-600/20',
+    badge: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-200 ring-emerald-600/20 dark:ring-emerald-400/30',
     dot: 'bg-emerald-500',
     hex: '#10b981',
   },
   in_use: {
     label: 'Em uso',
-    badge: 'bg-sky-100 text-sky-800 ring-sky-600/20',
+    badge: 'bg-sky-100 dark:bg-sky-900/40 text-sky-800 dark:text-sky-200 ring-sky-600/20 dark:ring-sky-400/30',
     dot: 'bg-sky-500',
     hex: '#0ea5e9',
   },
   maintenance: {
     label: 'Manutenção / Esterilização',
-    badge: 'bg-amber-100 text-amber-800 ring-amber-600/20',
+    badge: 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 ring-amber-600/20 dark:ring-amber-400/30',
     dot: 'bg-amber-400',
     hex: '#f59e0b',
   },
   retired: {
     label: 'Baixado',
-    badge: 'bg-red-100 text-red-800 ring-red-600/20',
+    badge: 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200 ring-red-600/20 dark:ring-red-400/30',
     dot: 'bg-red-500',
     hex: '#ef4444',
   },

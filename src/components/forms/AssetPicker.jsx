@@ -45,13 +45,13 @@ export function AssetSummary({ asset }) {
   const { sectorName } = useData();
   if (!asset) return null;
   return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+    <div className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-3 py-2 text-sm">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-mono text-xs font-semibold text-brand-700">{asset.tag}</span>
-        <span className="text-slate-700">{asset.name}</span>
+        <span className="font-mono text-xs font-semibold text-brand-700 dark:text-sky-300">{asset.tag}</span>
+        <span className="text-slate-700 dark:text-slate-200">{asset.name}</span>
         <StatusBadge status={asset.status} />
       </div>
-      <p className="mt-1 text-xs text-slate-500">
+      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
         Setor de origem: {sectorName(asset.sectorId)}
         {asset.assignedTo &&
           ` · com ${asset.assignedTo.user} (${sectorName(asset.assignedTo.sectorId)}) há ${fmtDuration(asset.assignedTo.since)}`}

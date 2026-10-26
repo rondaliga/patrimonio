@@ -30,7 +30,7 @@ export default function RetireForm({ asset, onDone }) {
   return (
     <form onSubmit={submit} className="space-y-3" noValidate>
       <AssetSummary asset={asset} />
-      <p className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">
+      <p className="rounded bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
         A baixa é definitiva: o ativo sai de circulação e não poderá mais ser retirado.
       </p>
       <Field label="Motivo da baixa" htmlFor="rt-reason" error={errors.reason}>

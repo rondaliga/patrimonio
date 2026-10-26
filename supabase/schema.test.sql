@@ -21,6 +21,21 @@ begin
   end;
   raise exception 'FALHOU (deveria ter sido bloqueado): %', label;
 end $$;
+create function t.pw_ok(p_email text, p_pw text) returns boolean language sql security definer as
+$$ select encrypted_password = extensions.crypt(p_pw, encrypted_password) from auth.users where email = p_email $$;
+create function t.auth_ok(p_email text) returns boolean language sql security definer as
+$$ select email_confirmed_at is not null and aud = 'authenticated' and role = 'authenticated'
+          and confirmation_token = '' and recovery_token = '' and email_change = '' and email_change_token_new = ''
+          and encrypted_password like '$2%' from auth.users where email = p_email $$;
+create function t.auth_count(p_like text) returns bigint language sql security definer as
+$$ select count(*) from auth.users where email like p_like $$;
+create function t.ident_ok(p_email text) returns boolean language sql security definer as
+$$ select count(*) = 1 and bool_and(provider = 'email' and email = p_email and identity_data ->> 'email' = p_email)
+     from auth.identities where email = p_email $$;
+create function t.sessions(p_user uuid) returns bigint language sql security definer as
+$$ select count(*) from auth.sessions where user_id = p_user $$;
+create function t.add_session(p_user uuid) returns void language sql security definer as
+$$ insert into auth.sessions(user_id) values (p_user) $$;
 grant execute on all functions in schema t to authenticated, anon;
 
 begin;
@@ -102,22 +117,73 @@ select t.login('00000000-0000-0000-0000-0000000000c3');
 select t.ok((select count(*) from public.profiles) = 1, 'demais usuários só veem o próprio perfil');
 with u as (update public.profiles set role='admin' where id='00000000-0000-0000-0000-0000000000c3' returning 1) select t.ok((select count(*) from u) = 0, 'ninguém se promove a admin');
 
-\echo == APAGAR HISTÓRICO
+\echo == EXCLUIR REGISTRO DO HISTÓRICO
 select t.login('00000000-0000-0000-0000-0000000000c3');
-select t.fails($$select public.clear_history()$$, 'Sem permissão', 'enfermagem não apaga o histórico');
+select t.fails($$select public.delete_event(1)$$, 'Sem permissão', 'enfermagem não exclui registro do histórico');
 select t.login('00000000-0000-0000-0000-0000000000b2');
-select t.fails($$select public.clear_history()$$, 'Sem permissão', 'técnico não apaga o histórico');
+select t.fails($$select public.delete_event(1)$$, 'Sem permissão', 'técnico não exclui registro do histórico');
 select t.login('00000000-0000-0000-0000-0000000000a1');
-select t.ok((select count(*) from public.events) > 0, 'há histórico para apagar');
-select t.ok(public.clear_history(now() - interval '1 day') = 0, 'apagar só o antigo não remove eventos recentes');
-select t.ok(public.clear_history() > 0, 'admin apaga todo o histórico');
-select t.ok((select count(*) from public.events) = 0, 'histórico vazio depois de apagar');
-select t.ok((select count(*) from public.assets where tag='RAD-0001') = 1, 'os ativos permanecem');
+select min(id) as ev_id from public.events where tag='RAD-0001' \gset
+select t.ok(public.delete_event(:ev_id) = 1, 'admin exclui um registro');
+select t.ok((select count(*) from public.events where id = :ev_id) = 0, 'o registro some do histórico');
+select t.ok(public.delete_event(:ev_id) = 0, 'excluir de novo não encontra nada');
+select t.ok((select count(*) from public.events where tag='RAD-0001') > 0, 'os demais registros do ativo permanecem');
+select t.ok((select count(*) from public.assets where tag='RAD-0001') = 1, 'o ativo permanece');
+
+\echo == GESTÃO DE USUÁRIOS
+-- (a1 = admin, b2 = técnico, c3 = enfermagem, d4 = consulta/técnico)
+select t.login('00000000-0000-0000-0000-0000000000c3');
+select t.fails($$select * from public.admin_list_users()$$, 'Sem permissão', 'enfermagem não lista usuários');
+select t.fails($$select public.admin_create_user('maria','Maria Souza','consulta','senha12345')$$, 'Sem permissão', 'enfermagem não cria usuário');
+select t.fails($$select public.admin_set_password('00000000-0000-0000-0000-0000000000d4','novasenha123')$$, 'Sem permissão', 'enfermagem não troca senha de ninguém');
+select t.fails($$select public.admin_delete_user('00000000-0000-0000-0000-0000000000d4')$$, 'Sem permissão', 'enfermagem não exclui usuário');
+select t.fails($$select public.admin_update_user('00000000-0000-0000-0000-0000000000c3','Eu','admin')$$, 'Sem permissão', 'ninguém se promove pela função');
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select t.ok((select count(*) from public.admin_list_users()) = 4, 'admin lista os 4 usuários');
+select public.admin_create_user('  Maria.Souza ', ' Maria Souza ', 'consulta', 'senha12345') as novo \gset
+select t.ok((select username = 'maria.souza' and full_name = 'Maria Souza' and role = 'consulta' from public.profiles where username = 'maria.souza'), 'cria usuário (usuário em minúsculas, nome sem espaços, perfil)');
+select t.ok(t.auth_ok('maria.souza@patrimonio.invalid') and t.pw_ok('maria.souza@patrimonio.invalid', 'senha12345') and not t.pw_ok('maria.souza@patrimonio.invalid', 'errada123'), 'conta no Auth: e-mail interno, confirmada, senha com hash bcrypt, tokens vazios');
+select t.ok(t.ident_ok('maria.souza@patrimonio.invalid'), 'identidade de e-mail criada');
+select t.fails($$select public.admin_create_user('MARIA.souza','Outra Maria','consulta','senha12345')$$, 'Já existe um usuário', 'usuário duplicado (caixa) é recusado');
+select t.fails($$select public.admin_create_user('ab','Nome Ok','consulta','senha12345')$$, 'Nome de usuário inválido', 'usuário curto demais');
+select t.fails($$select public.admin_create_user('joão silva','Nome Ok','consulta','senha12345')$$, 'Nome de usuário inválido', 'usuário com acento/espaço');
+select t.fails($$select public.admin_create_user('joao','X','consulta','senha12345')$$, 'nome completo', 'nome obrigatório');
+select t.fails($$select public.admin_create_user('joao','João Lima','root','senha12345')$$, 'Perfil de acesso inválido', 'perfil inválido');
+select t.fails($$select public.admin_create_user('joao','João Lima','consulta','curta')$$, 'pelo menos 8', 'senha curta');
+select t.ok((select count(*) from public.admin_list_users()) = 5, 'falhas não deixam usuário pela metade');
+select t.ok(t.auth_count('%@patrimonio.invalid') = 1, 'só a conta válida foi criada no Auth (nenhuma órfã das tentativas que falharam)');
+
+select t.login((select id from public.profiles where username = 'maria.souza'));
+select t.ok((select role from public.profiles where id = auth.uid()) = 'consulta', 'novo usuário entra como visualizador');
+select t.fails($$select public.checkout_asset('RAD-0001','Ana','uti')$$, 'Sem permissão', 'visualizador não movimenta');
+select t.login('00000000-0000-0000-0000-0000000000a1');
+
+select public.admin_update_user((select id from public.profiles where username = 'maria.souza'), 'Maria S. Souza', 'enfermagem');
+select t.ok((select full_name = 'Maria S. Souza' and role = 'enfermagem' from public.profiles where username = 'maria.souza'), 'admin altera nome e perfil');
+select t.fails($$select public.admin_update_user('00000000-0000-0000-0000-0000000000a1','Admin','consulta')$$, 'próprio acesso de administrador', 'admin não se rebaixa');
+select t.fails($$select public.admin_update_user('00000000-0000-0000-0000-00000000ffff','Alguém','consulta')$$, 'não encontrado', 'atualizar usuário inexistente');
+select public.admin_update_user('00000000-0000-0000-0000-0000000000a1','Administrador Geral','admin');
+select t.ok((select full_name = 'Administrador Geral' from public.profiles where id = '00000000-0000-0000-0000-0000000000a1'), 'admin edita o próprio nome mantendo o perfil');
+
+select t.add_session((select id from public.profiles where username = 'maria.souza'));
+select public.admin_set_password((select id from public.profiles where username = 'maria.souza'), 'outrasenha99');
+select t.ok(t.pw_ok('maria.souza@patrimonio.invalid', 'outrasenha99') and not t.pw_ok('maria.souza@patrimonio.invalid', 'senha12345'), 'admin redefine a senha de outra pessoa');
+select t.ok(t.sessions((select id from public.profiles where username = 'maria.souza')) = 0, 'sessões abertas da pessoa são encerradas');
+select t.fails($$select public.admin_set_password((select id from public.profiles where username = 'maria.souza'), '1234567')$$, 'pelo menos 8', 'redefinir com senha curta');
+select t.fails($$select public.admin_set_password('00000000-0000-0000-0000-00000000ffff', 'umasenhaboa1')$$, 'não encontrado', 'redefinir senha de usuário inexistente');
+
+select t.fails($$select public.admin_delete_user('00000000-0000-0000-0000-0000000000a1')$$, 'própria conta', 'admin não exclui a si mesmo');
+select public.admin_delete_user((select id from public.profiles where username = 'maria.souza'));
+select t.ok((select count(*) from public.profiles where username = 'maria.souza') = 0 and t.auth_count('maria.souza@%') = 0, 'excluir remove conta e perfil');
+select t.fails($$select public.admin_delete_user('00000000-0000-0000-0000-00000000ffff')$$, 'não encontrado', 'excluir usuário inexistente');
+select t.ok((select count(*) from public.events where actor is not null) > 0, 'histórico feito pelo usuário excluído permanece');
 
 \echo == ANÔNIMO
 reset role; set local role anon;
 select t.fails($$select * from public.assets$$, 'permission denied', 'anônimo não lê ativos');
 select t.fails($$select public.app_role()$$, 'permission denied', 'anônimo não chama funções');
+select t.fails($$select public.admin_create_user('invasor','Invasor','admin','senha12345')$$, 'permission denied', 'anônimo não cria usuário');
+select t.fails($$select * from public.admin_list_users()$$, 'permission denied', 'anônimo não lista usuários');
 
 \echo == INTEGRIDADE (mesmo como dono do banco)
 reset role;

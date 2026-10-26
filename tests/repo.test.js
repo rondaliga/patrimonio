@@ -75,3 +75,28 @@ test('desempenho: páginas em chunks, adaptadores sob demanda e service worker',
   assert.match(read('vite.config.js'), /manualChunks/);
   assert.ok(has('public/sw.js'));
 });
+
+test('schema.sql: funções de usuários só para o papel admin e fora do alcance do anônimo', () => {
+  const sql = read('supabase/schema.sql');
+  for (const fn of ['admin_list_users', 'admin_create_user', 'admin_update_user', 'admin_set_password', 'admin_delete_user']) {
+    const def = sql.slice(sql.indexOf(`function public.${fn}(`));
+    assert.ok(def.includes('security definer'), `${fn}: security definer`);
+    assert.ok(def.slice(0, def.indexOf('$$;')).includes("_require_role('admin')"), `${fn}: exige admin`);
+    assert.match(sql, new RegExp(`grant execute on function public\\.${fn}\\(`), `${fn}: grant só para authenticated`);
+  }
+  assert.ok(sql.indexOf('admin_delete_user(p_id uuid)') < sql.indexOf('revoke all on all functions'), 'funções criadas antes do revoke geral');
+  assert.match(sql, /_clean_username/);
+  assert.match(sql, /profiles_username_unique/);
+});
+
+test('tema: script anti-flash no index.html e darkMode por classe no Tailwind', () => {
+  assert.match(read('index.html'), /patrimonio-theme/);
+  assert.match(read('index.html'), /classList\.add\('dark'\)/);
+  assert.match(read('tailwind.config.js'), /darkMode: 'class'/);
+});
+
+test('telas novas: rota, menu só para admin e nenhuma tela pede e-mail no login', () => {
+  assert.match(read('src/router/routes.js'), /'\/usuarios': 'users'/);
+  assert.match(read('src/components/layout/Sidebar.jsx'), /adminOnly: true/);
+  assert.ok(!/E-mail/.test(read('src/context/AuthContext.jsx')), 'login por usuário, não por e-mail');
+});

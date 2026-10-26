@@ -16,10 +16,10 @@ no GitHub Pages. **O código já está pronto**: `supabaseAdapter.js`, tela de l
 
 | Papel | Pode |
 | --- | --- |
-| `admin` | tudo (inclui setores, exclusões e perfis) |
+| `admin` | tudo (inclui setores, exclusões, histórico e usuários) |
 | `tecnico` | cadastrar/editar ativos, manutenção, baixa, retirada/devolução |
 | `enfermagem` | retirada/devolução |
-| `consulta` | apenas ver |
+| `consulta` (aparece como **Visualizador**) | apenas ver |
 
 > O adaptador foi testado com um cliente simulado e o schema com PostgreSQL real, **mas não contra um
 > projeto Supabase real**. Rode primeiro em um projeto de teste.
@@ -28,14 +28,19 @@ no GitHub Pages. **O código já está pronto**: `supabaseAdapter.js`, tela de l
 
 1. Crie um projeto em supabase.com (região mais próxima, ex.: South America – São Paulo).
 2. **Authentication → Users → Add user → Create new user**: e-mail + senha, marcando **"Auto Confirm User"**.
+   Este é só o primeiro administrador; as demais contas são criadas pelo próprio app (tela **Usuários**).
 3. Abra `supabase/schema.sql` em um editor de texto e, perto do **final**, troque `SEU@EMAIL.COM` pelo e-mail do passo 2
-   (só na linha `v_email text := '...'`).
+   (só na linha `v_login text := '...'`).
 4. **SQL Editor → New query** → cole o arquivo **inteiro** → **Run**.
    O arquivo é único e pode ser executado várias vezes sem erro. Ao final, a aba de mensagens mostra
-   `OK: ... agora é administrador.` Se mostrar `ATENÇÃO`, siga a mensagem (e-mail não trocado ou usuário inexistente) e rode de novo.
+   `OK: ... agora é administrador.` e `OK: ... agora entra com o nome de usuário "...".` Se mostrar `ATENÇÃO`, siga a mensagem (e-mail não trocado ou usuário inexistente) e rode de novo.
+   **O login do app é por nome de usuário, não por e-mail.** Contas que já existiam recebem como usuário a parte do e-mail antes do `@`
+   (ex.: `maria@gmail.com` → `maria`), com a mesma senha. Por baixo, o Supabase guarda `usuario@patrimonio.invalid`
+   (domínio reservado que nunca recebe mensagens); é normal ver isso em Authentication → Users.
 5. Desative o cadastro aberto: **Authentication → Sign In / Providers → Email → desligue "Allow new users to sign up"**.
-   Novos usuários nascem com papel `consulta`; promova-os rodando o arquivo com o e-mail deles, ou
-   `update public.profiles set role = 'tecnico' where id = '<UUID>';`.
+   Crie e administre as contas da equipe em **Usuários** (menu, só administrador): nome, usuário, perfil
+   (Administrador, Técnico, Enfermagem ou Visualizador) e senha inicial; depois dá para editar o perfil,
+   redefinir a senha de qualquer pessoa e excluir contas. Cada pessoa troca a própria senha pelo ícone de chave no topo.
 6. Copie **Project URL** e **anon public key** (Project Settings → API).
 7. No projeto: `npm install`, copie `.env.example` para `.env.local` e preencha:
    ```
@@ -58,7 +63,7 @@ no GitHub Pages. **O código já está pronto**: `supabaseAdapter.js`, tela de l
 ## Limitações do modo online
 
 - "Importar backup", "Restaurar demonstração" e "Apagar todos os ativos" não existem (são do modo local).
-- "Apagar histórico" (Configurações) existe nos dois modos, mas no online só o administrador consegue: a exclusão passa pela função `clear_history` do banco (o front-end não tem DELETE direto em `events`). Rode o `schema.sql` de novo para criá-la.
+- Excluir um registro do histórico (lixeira ao lado de cada registro) só é permitido ao admin e passa pela função `delete_event` do banco (o front-end não tem DELETE direto em `events`). **Rode o `schema.sql` de novo para criá-la**; sem isso o app avisa que o banco não tem a função.
 - Excluir ativo só é permitido ao admin e apenas para ativos sem movimentações; os demais devem ser baixados.
 
 ## Cuidados (LGPD e operação)
@@ -68,3 +73,17 @@ no GitHub Pages. **O código já está pronto**: `supabaseAdapter.js`, tela de l
 - Configure backups do projeto Supabase e confirme a região e o plano antes de usar em produção.
 - Se o hospital exigir dados na rede interna, hospede o mesmo schema em um PostgreSQL próprio com uma
   API — o adaptador continua sendo o único ponto a trocar.
+
+## Usuários e senhas (como funciona)
+
+- O front-end só tem a chave pública, que não cria contas no Supabase Auth. Por isso as contas são criadas pelas funções
+  `admin_create_user`, `admin_update_user`, `admin_set_password`, `admin_delete_user` e `admin_list_users` do `schema.sql`:
+  todas conferem que quem chama é `admin` e gravam em `auth.users` (senha com bcrypt). **Rode o `schema.sql` de novo ao atualizar.**
+- Regras: usuário de 3 a 30 caracteres (minúsculas, números, `.`, `-`, `_`); senha de 8 a 72 caracteres; o administrador não pode
+  excluir a própria conta nem tirar o próprio perfil de administrador (evita ficar sem ninguém no comando).
+- Redefinir a senha de alguém encerra as sessões abertas dessa pessoa. A própria senha é trocada com confirmação da senha atual.
+- **Teste antes de usar de verdade:** a criação de contas escreve direto nas tabelas do Auth (jeito que não depende de nenhum servidor
+  extra). Foi testada em PostgreSQL real com uma cópia simulada dessas tabelas, mas não contra o GoTrue de um projeto Supabase real.
+  Crie um usuário de teste, entre com ele e confira. Se algo falhar, crie a conta pelo painel (Authentication → Users) usando o e-mail
+  `usuario@patrimonio.invalid` e ajuste o perfil em **Usuários**.
+- Sem e-mail não há "esqueci minha senha": quem esquecer pede ao administrador (ícone de chave na linha da pessoa).

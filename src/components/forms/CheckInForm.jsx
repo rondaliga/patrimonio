@@ -63,7 +63,7 @@ export default function CheckInForm({ initialTag = '', lockAsset = false, onDone
         <legend className="label">Condição na devolução</legend>
         <div className="space-y-1.5">
           {Object.entries(CONDITIONS).map(([value, text]) => (
-            <label key={value} className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+            <label key={value} className="flex cursor-pointer items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
               <input
                 type="radio"
                 name="ci-condition"

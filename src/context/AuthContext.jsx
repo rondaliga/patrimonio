@@ -1,8 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { HeartPulse } from 'lucide-react';
 import { Field, FormError, inputClass } from '../components/ui/Field.jsx';
+import PasswordInput from '../components/ui/PasswordInput.jsx';
+import ThemeToggle from '../components/ui/ThemeToggle.jsx';
+import { usernameFromEmail } from '../lib/accounts.js';
 
-const AuthContext = createContext({ user: null, role: 'admin', fullName: '', signOut: null });
+const AuthContext = createContext({ user: null, userId: null, role: 'admin', fullName: '', username: '', signOut: null, changePassword: null });
 
 // Sem `api.auth` (modo local) o app abre direto, com todas as permissões.
 // Com `api.auth` (Supabase) exige login e carrega o papel do usuário.
@@ -47,23 +50,26 @@ export function AuthProvider({ children, api }) {
   }, [auth, load]);
 
   const value = useMemo(() => {
-    if (!auth || !state?.session) return { user: null, role: 'admin', fullName: '', signOut: null };
+    if (!auth || !state?.session) return { user: null, userId: null, role: 'admin', fullName: '', username: '', signOut: null, changePassword: null };
     return {
       user: state.session.user,
+      userId: state.session.user.id,
       role: state.profile.role,
       fullName: state.profile.fullName,
+      username: state.profile.username || usernameFromEmail(state.session.user.email),
       signOut: () => auth.signOut(),
+      changePassword: (current, next) => auth.changePassword(current, next),
     };
   }, [auth, state]);
 
   if (!auth) return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-  if (state.loading) return <div className="p-6 text-sm text-slate-500">Carregando…</div>;
+  if (state.loading) return <div className="p-6 text-sm text-slate-500 dark:text-slate-400">Carregando…</div>;
   if (!state.session) return <LoginScreen auth={auth} initialError={state.error} />;
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 function LoginScreen({ auth, initialError }) {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(initialError || '');
   const [busy, setBusy] = useState(false);
@@ -71,10 +77,10 @@ function LoginScreen({ auth, initialError }) {
   const submit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!email.trim() || !password) return setError('Informe e-mail e senha.');
+    if (!username.trim() || !password) return setError('Informe usuário e senha.');
     setBusy(true);
     try {
-      await auth.signIn(email, password);
+      await auth.signIn(username, password);
     } catch (err) {
       setError(err.message);
       setBusy(false);
@@ -83,23 +89,35 @@ function LoginScreen({ auth, initialError }) {
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="fixed right-4 top-4"><ThemeToggle /></div>
       <form onSubmit={submit} noValidate className="card w-full max-w-sm space-y-3 p-6">
-        <div className="flex items-center gap-2 text-brand-700">
+        <div className="flex items-center gap-2 text-brand-700 dark:text-sky-300">
           <HeartPulse className="h-6 w-6" />
           <div className="leading-tight">
             <h1 className="text-base font-semibold">PatrimônioHosp</h1>
-            <p className="text-xs text-slate-500">Entre para continuar</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Entre para continuar</p>
           </div>
         </div>
-        <Field label="E-mail" htmlFor="login-email">
-          <input id="login-email" type="email" className={inputClass()} value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" autoFocus />
+        <Field label="Usuário" htmlFor="login-username">
+          <input
+            id="login-username"
+            type="text"
+            className={inputClass()}
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            autoComplete="username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            autoFocus
+          />
         </Field>
         <Field label="Senha" htmlFor="login-password">
-          <input id="login-password" type="password" className={inputClass()} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+          <PasswordInput id="login-password" value={password} onChange={setPassword} autoComplete="current-password" />
         </Field>
         <FormError message={error} />
         <button type="submit" className="btn btn-primary w-full" disabled={busy}>Entrar</button>
-        <p className="text-xs text-slate-500">Contas são criadas pelo administrador do sistema.</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">Contas são criadas pelo administrador do sistema.</p>
       </form>
     </div>
   );

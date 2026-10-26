@@ -30,7 +30,7 @@ export function ToastProvider({ children }) {
           <div
             key={t.id}
             className={`pointer-events-auto flex max-w-md items-start gap-2 rounded-md px-3 py-2 text-sm text-white shadow-lg ${
-              t.type === 'error' ? 'bg-red-600' : 'bg-slate-800'
+              t.type === 'error' ? 'bg-red-600' : 'bg-slate-800 dark:bg-slate-700'
             }`}
           >
             {t.type === 'error' ? (

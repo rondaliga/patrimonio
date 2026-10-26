@@ -26,14 +26,14 @@ export default function MaintenancePage({ query }) {
       <section className="card">
         <div className="card-header">
           <h2 className="card-title">Em manutenção / esterilização</h2>
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">{list.length}</span>
+          <span className="rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-200">{list.length}</span>
         </div>
         {list.length === 0 ? (
           <EmptyState title="Nenhum ativo em manutenção" />
         ) : (
           <div className="overflow-x-auto">
             <table className="table-dense w-full">
-              <thead className="bg-slate-50">
+              <thead className="bg-slate-50 dark:bg-slate-800/50">
                 <tr>
                   <th>Patrimônio</th>
                   <th>Ativo</th>
@@ -43,35 +43,35 @@ export default function MaintenancePage({ query }) {
                   <th><span className="sr-only">Ações</span></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {list.map((a) => {
                   const Icon = a.maintenance.kind === 'sterilization' ? Droplets : Wrench;
                   return (
-                    <tr key={a.tag} className="hover:bg-slate-50">
+                    <tr key={a.tag} className="hover:bg-slate-50 dark:hover:bg-slate-800">
                       <td>
-                        <a href={`#/ativos/${encodeURIComponent(a.tag)}`} className="font-mono text-xs font-semibold text-brand-700 hover:underline">
+                        <a href={`#/ativos/${encodeURIComponent(a.tag)}`} className="font-mono text-xs font-semibold text-brand-700 dark:text-sky-300 hover:underline">
                           {a.tag}
                         </a>
                       </td>
                       <td>
                         {a.name}
-                        <span className="block text-[11px] text-slate-500">{sectorName(a.sectorId)}</span>
+                        <span className="block text-[11px] text-slate-500 dark:text-slate-400">{sectorName(a.sectorId)}</span>
                         {/* No celular, tipo, motivo e tempo parado aparecem sob o nome (as colunas ficam ocultas) */}
-                        <span className="mt-1 block text-xs text-amber-700 md:hidden">
+                        <span className="mt-1 block text-xs text-amber-700 dark:text-amber-300 md:hidden">
                           <Icon className="mr-1 inline h-3 w-3" />
                           {MAINTENANCE_KINDS[a.maintenance.kind]} · {a.maintenance.reason}
                         </span>
-                        <span className="block text-[11px] text-slate-500 md:hidden">há {fmtDuration(a.maintenance.since)}</span>
+                        <span className="block text-[11px] text-slate-500 dark:text-slate-400 md:hidden">há {fmtDuration(a.maintenance.since)}</span>
                       </td>
                       <td className="hidden md:table-cell">
-                        <span className="inline-flex items-center gap-1 whitespace-nowrap text-amber-700">
+                        <span className="inline-flex items-center gap-1 whitespace-nowrap text-amber-700 dark:text-amber-300">
                           <Icon className="h-3.5 w-3.5" /> {MAINTENANCE_KINDS[a.maintenance.kind]}
                         </span>
                       </td>
                       <td className="hidden md:table-cell">{a.maintenance.reason}</td>
-                      <td className="hidden whitespace-nowrap text-slate-500 md:table-cell">
+                      <td className="hidden whitespace-nowrap text-slate-500 dark:text-slate-400 md:table-cell">
                         {fmtDateTime(a.maintenance.since)}
-                        <span className="block text-[11px] text-slate-500">há {fmtDuration(a.maintenance.since)}</span>
+                        <span className="block text-[11px] text-slate-500 dark:text-slate-400">há {fmtDuration(a.maintenance.since)}</span>
                       </td>
                       <td className="text-right">
                         {canManage && (

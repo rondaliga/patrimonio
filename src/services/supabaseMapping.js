@@ -37,12 +37,25 @@ export function rowToEvent(r) {
   return e;
 }
 
+export const rowToUser = (r) => ({
+  id: r.id,
+  username: r.username ?? '',
+  fullName: r.full_name ?? '',
+  role: r.role,
+  createdAt: r.created_at ? iso(r.created_at) : null,
+  lastSignInAt: r.last_sign_in_at ? iso(r.last_sign_in_at) : null,
+});
+
 // Mensagens levantadas pelas funções RPC -> campo do formulário.
 const FIELD_HINTS = [
   [/quem está retirando/i, 'user'],
   [/setor de destino/i, 'sectorId'],
   [/motivo/i, 'reason'],
   [/condição inválida/i, 'condition'],
+  [/nome de usuário|já existe um usuário/i, 'username'],
+  [/nome completo/i, 'fullName'],
+  [/perfil de acesso/i, 'role'],
+  [/senha/i, 'password'],
   [/manutenção ou esterilização/i, 'kind'],
 ];
 
@@ -54,11 +67,15 @@ export function toValidationError(error) {
     return new ValidationError('Sem permissão para esta operação.');
   }
   if (code === '23505') {
+    if (/profiles_username_unique|users_email/.test(msg)) return new ValidationError('Já existe um usuário com este nome de usuário.', { username: 'Já existe um usuário com este nome de usuário.' });
     if (/assets_pkey|tag/.test(msg)) return new ValidationError('Já existe um ativo com este patrimônio.', { tag: 'Já existe um ativo com este patrimônio.' });
     return new ValidationError('Já existe um setor com este nome.', { name: 'Já existe um setor com este nome.' });
   }
   if (code === '23503') {
     return new ValidationError('Este registro possui vínculos (ativos ou histórico). Mova-os antes de excluir.');
+  }
+  if (code === 'PGRST202' || code === '42883' || /could not find the function|schema cache/i.test(msg)) {
+    return new ValidationError('O banco ainda não tem esta função. Rode o arquivo supabase/schema.sql de novo no SQL Editor do Supabase e tente outra vez.');
   }
   if (/JWT|expired|not authenticated/i.test(msg)) {
     return new ValidationError('Sessão expirada. Entre novamente.');

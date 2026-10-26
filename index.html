@@ -3,6 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f1f5f9" />
+    <script>
+      // Aplica o tema antes da primeira pintura (evita o "flash" claro no tema escuro).
+      // Mesma regra de src/lib/theme.js: escolha salva ou, sem ela, o tema do sistema.
+      (function () {
+        try {
+          var t = localStorage.getItem('patrimonio-theme');
+          var dark = t ? t === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (dark) {
+            document.documentElement.classList.add('dark');
+            document.documentElement.style.colorScheme = 'dark';
+            document.querySelector('meta[name="theme-color"]').setAttribute('content', '#020617');
+          }
+        } catch (e) {}
+      })();
+    </script>
     <title>Patrimônio Hospitalar</title>
     <link
       rel="icon"
@@ -29,10 +45,12 @@
       #boot .bar { height: 2.5rem; background: #e2e8f0; border-radius: 6px; margin-bottom: 1.5rem; max-width: 18rem; }
       #boot .blk { height: 6rem; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 1rem; animation: bootpulse 1.4s ease-in-out infinite; }
       @keyframes bootpulse { 50% { opacity: .55; } }
+      .dark #boot .side, .dark #boot .blk { background: #0f172a; border-color: #334155; }
+      .dark #boot .bar { background: #1e293b; }
       @media (max-width: 767px) { #boot .side { display: none; } }
     </style>
   </head>
-  <body class="bg-slate-100 text-slate-800">
+  <body class="bg-slate-100 text-slate-800 dark:bg-slate-950 dark:text-slate-100">
     <div id="root">
       <div id="boot" aria-hidden="true"><div class="side"></div><div class="main"><div class="bar"></div><div class="blk"></div><div class="blk"></div></div></div>
       <!-- Aviso exibido só se o JavaScript do app não carregar -->

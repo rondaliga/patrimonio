@@ -34,11 +34,11 @@ export default function SectorsPage() {
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">Setores e alas</h2>
-          <span className="text-xs text-slate-500">{plural(data.sectors.length, 'setor', 'setores')}</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400">{plural(data.sectors.length, 'setor', 'setores')}</span>
         </div>
         <div className="overflow-x-auto">
           <table className="table-dense w-full">
-            <thead className="bg-slate-50">
+            <thead className="bg-slate-50 dark:bg-slate-800/50">
               <tr>
                 <th>Setor</th>
                 <th className="text-right">Total</th>
@@ -48,17 +48,17 @@ export default function SectorsPage() {
                 <th />
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {stats.bySector.map((row) => (
-                <tr key={row.id} className="hover:bg-slate-50">
+                <tr key={row.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
                   <td>
-                    <a href={`#/ativos?setor=${encodeURIComponent(row.id)}`} className="font-medium text-brand-700 hover:underline">
+                    <a href={`#/ativos?setor=${encodeURIComponent(row.id)}`} className="font-medium text-brand-700 dark:text-sky-300 hover:underline">
                       {row.sector}
                     </a>
                   </td>
                   <td className="text-right font-semibold">{row.total}</td>
                   {STATUS_ORDER.map((s) => (
-                    <td key={s} className="text-right text-slate-600">{row.byStatus[s]}</td>
+                    <td key={s} className="text-right text-slate-600 dark:text-slate-300">{row.byStatus[s]}</td>
                   ))}
                   <td className="text-right">
                     {canManage && <button

@@ -1,10 +1,19 @@
 # Changelog
 
-## 1.4.0 — apagar histórico
-- **Configurações → Histórico → Apagar histórico:** remove o registro de movimentações (atividade recente, últimas movimentações, histórico de cada ativo e dados dos relatórios). Dá para apagar tudo ou só o anterior a 30 dias, 90 dias ou 1 ano. Os ativos e a situação atual deles (em uso, em manutenção…) não mudam. Pede confirmação e só aparece para administradores.
-- Modo local: a numeração dos eventos continua crescendo (não reaproveita números).
-- Modo online (Supabase): nova função `clear_history(p_before)` no banco, restrita ao administrador (o histórico continua sem DELETE direto pelo front-end). **Rode o `supabase/schema.sql` de novo.** Outras sessões abertas atualizam em tempo real.
-- Ativos sem movimentações passam a poder ser excluídos depois de apagar o histórico (regra de exclusão inalterada).
+## 1.5.0 — usuários, senhas, login por usuário e tema escuro
+- **Login por nome de usuário** (não mais por e-mail). Contas antigas ganham como usuário a parte do e-mail antes do `@` e mantêm a senha (o `schema.sql` faz a migração ao ser rodado de novo).
+- **Tela Usuários** (menu, só administrador): criar conta (nome, usuário, perfil, senha com botão "Gerar"), editar nome e perfil, redefinir a senha de outra pessoa e excluir. O administrador não exclui a si mesmo nem se rebaixa.
+- **Alterar minha senha** (ícone de chave no topo, qualquer perfil): pede a senha atual.
+- Perfil "Consulta" agora se chama **Visualizador** (o valor no banco continua `consulta`).
+- **Tema claro/escuro**: botão no topo e na tela de login, respeita o tema do sistema, lembra a escolha e não pisca ao abrir.
+- Banco: novas funções `admin_*` e coluna `profiles.username`. **Rode o `supabase/schema.sql` de novo.** Veja "Usuários e senhas" em FASE-2-SUPABASE.md (inclui o que ainda precisa ser testado em um projeto real).
+- Testes SQL agora cobrem permissões, validações, hash da senha, exclusão e migração; 85 testes automáticos.
+
+## 1.4.1 — excluir registros do histórico, um a um
+- Cada registro do histórico ganhou um ícone de lixeira (somente administrador): em **Atividade recente** (painel), **Últimas movimentações** e **Histórico de movimentações** do ativo. Pede confirmação; só o registro é apagado, o ativo e a situação atual dele não mudam.
+- Removida a opção de apagar o histórico inteiro de Configurações (introduzida na 1.4.0).
+- Modo online (Supabase): nova função `delete_event(p_id)` restrita ao administrador. **Rode o `supabase/schema.sql` de novo.** Se a função não existir, o app mostra "O banco ainda não tem esta função…" em vez de um erro técnico. Outras sessões abertas atualizam em tempo real.
+- Ativos cujo histórico foi excluído continuam com a regra de exclusão de ativo inalterada (só sem movimentações).
 
 ## 1.3.3 — tudo em português
 - "check-out" / "check-in" viraram "retirada" / "devolução" na interface (menu, títulos, botões, avisos, relatórios, mensagens de erro e do banco). "Dashboard" virou "Painel". "walkie-talkies" virou "rádios comunicadores".

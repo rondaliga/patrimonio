@@ -12,8 +12,8 @@ test('permissões espelham as políticas do banco', () => {
   for (const a of ['movement', 'maintenance', 'asset.create', 'asset.edit', 'asset.delete', 'sector.manage']) {
     assert.ok(!can('consulta', a), a);
   }
-  assert.ok(can('admin', 'history.clear'));
-  for (const r of ['tecnico', 'enfermagem', 'consulta']) assert.ok(!can(r, 'history.clear'), `history.clear ${r}`);
+  assert.ok(can('admin', 'event.delete'));
+  for (const r of ['tecnico', 'enfermagem', 'consulta']) assert.ok(!can(r, 'event.delete'), `event.delete ${r}`);
   assert.ok(!can('admin', 'acao-inexistente'));
 });
 

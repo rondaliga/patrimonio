@@ -3,13 +3,13 @@ import { useToast } from './ToastContext.jsx';
 import { useAuth } from './AuthContext.jsx';
 import { can as canRole } from '../lib/permissions.js';
 import { computeStats } from '../services/stats.js';
-import { plural } from '../lib/format.js';
 import {
   EVENTS_WINDOW_DAYS,
   applyChange,
   lastEventId,
   mergeEvents,
   removeAsset,
+  removeEvent,
   setSectors,
   upsertAsset,
 } from '../services/patch.js';
@@ -129,11 +129,7 @@ export function DataProvider({ children, api }) {
       importData: run((d) => api.importData(d), reload, 'Backup importado.'),
       resetDemo: run(() => api.resetDemo(), reload, 'Dados de demonstração restaurados.'),
       clearAll: run(() => api.clearAll(), reload, 'Todos os ativos foram apagados.'),
-      clearHistory: run(
-        (opts) => api.clearHistory(opts),
-        reload,
-        (n) => (n ? `Histórico apagado (${plural(n, 'registro', 'registros')}).` : 'Não havia registros para apagar.')
-      ),
+      deleteEvent: run((id) => api.deleteEvent(id), (_, id) => commit((d) => removeEvent(d, id)), 'Registro excluído.'),
       exportData: () => api.exportData(),
       // Consultas sob demanda (o estado só guarda os eventos recentes)
       eventsFor: (tag) => api.eventsFor(tag),
@@ -154,6 +150,7 @@ export function DataProvider({ children, api }) {
       mode: api.mode,
       persistent: api.persistent,
       capabilities: api.capabilities ?? {},
+      users: api.users ?? null, // gestão de contas (só no modo online)
       role,
       can,
       sectorName: (id) => sectorMap.get(id) ?? '—',
@@ -172,12 +169,12 @@ export function DataProvider({ children, api }) {
 
   if (loadError) {
     return (
-      <div className="p-6 text-sm text-red-700">
+      <div className="p-6 text-sm text-red-700 dark:text-red-300">
         Não foi possível carregar os dados: {String(loadError.message || loadError)}
       </div>
     );
   }
-  if (!data) return <div className="p-6 text-sm text-slate-500">Carregando…</div>;
+  if (!data) return <div className="p-6 text-sm text-slate-500 dark:text-slate-400">Carregando…</div>;
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }
 

@@ -16,8 +16,8 @@ export default function Dashboard() {
     return (
       <div className="card p-10 text-center">
         <Boxes className="mx-auto h-10 w-10 text-slate-300" />
-        <p className="mt-3 text-sm font-medium text-slate-700">Nenhum ativo cadastrado</p>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-3 text-sm font-medium text-slate-700 dark:text-slate-200">Nenhum ativo cadastrado</p>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
           {can('asset.create') ? 'Cadastre o primeiro ativo' : 'Aguarde o cadastro dos ativos'}
           {capabilities.demo ? ' ou carregue dados de demonstração para conhecer o sistema.' : '.'}
         </p>

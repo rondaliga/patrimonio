@@ -76,25 +76,25 @@ export default function ReportsPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="table-dense w-full">
-                <thead className="bg-slate-50">
+                <thead className="bg-slate-50 dark:bg-slate-800/50">
                   <tr><th>Patrimônio</th><th>Responsável</th><th>Setor</th><th>Fora há</th></tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {r.long.slice(0, 10).map((l) => (
                     <tr key={l.tag}>
                       <td>
-                        <a href={`#/ativos/${encodeURIComponent(l.tag)}`} className="font-mono text-xs font-semibold text-brand-700 hover:underline">{l.tag}</a>
+                        <a href={`#/ativos/${encodeURIComponent(l.tag)}`} className="font-mono text-xs font-semibold text-brand-700 dark:text-sky-300 hover:underline">{l.tag}</a>
                       </td>
                       <td>{l.user}</td>
                       <td>{l.sector}</td>
-                      <td className="whitespace-nowrap font-medium text-amber-600" title={fmtDateTime(l.since)}>{fmtDuration(l.since)}</td>
+                      <td className="whitespace-nowrap font-medium text-amber-600 dark:text-amber-400" title={fmtDateTime(l.since)}>{fmtDuration(l.since)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               {r.long.length > 10 && (
-                <p className="border-t border-slate-100 px-4 py-2 text-xs text-slate-500">
-                  Mostrando 10 de {r.long.length}. <a className="text-brand-600 hover:underline" href="#/ativos?status=in_use">Ver todos em uso</a>
+                <p className="border-t border-slate-100 dark:border-slate-800 px-4 py-2 text-xs text-slate-500 dark:text-slate-400">
+                  Mostrando 10 de {r.long.length}. <a className="text-brand-600 dark:text-sky-300 hover:underline" href="#/ativos?status=in_use">Ver todos em uso</a>
                 </p>
               )}
             </div>
@@ -108,11 +108,11 @@ export default function ReportsPage() {
           {r.bySector.length === 0 ? (
             <EmptyState title="Sem movimentações no período" />
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-slate-100 dark:divide-slate-800">
               {r.bySector.map(({ id, n }) => (
                 <li key={id} className="flex items-center justify-between px-4 py-2 text-sm">
-                  <span className="text-slate-700">{sectorName(id)}</span>
-                  <span className="font-semibold text-slate-800">{n}</span>
+                  <span className="text-slate-700 dark:text-slate-200">{sectorName(id)}</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-100">{n}</span>
                 </li>
               ))}
             </ul>
@@ -130,7 +130,7 @@ export default function ReportsPage() {
             <Download className="h-4 w-4" /> Movimentações (CSV)
           </button>
         </div>
-        <p className="mt-2 text-xs text-slate-500">Formato CSV com separador “;”, pronto para abrir no Excel.</p>
+        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Formato CSV com separador “;”, pronto para abrir no Excel.</p>
       </section>
     </div>
   );

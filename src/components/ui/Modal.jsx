@@ -29,8 +29,8 @@ export default function Modal({ open, title, onClose, children, size = 'md' }) {
         className={`card flex max-h-[92vh] w-full flex-col rounded-b-none sm:rounded-b-lg ${SIZES[size]}`}
       >
         <div className="card-header">
-          <h2 className="text-base font-semibold text-slate-800">{title}</h2>
-          <button onClick={onClose} aria-label="Fechar" className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-600">
+          <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">{title}</h2>
+          <button onClick={onClose} aria-label="Fechar" className="rounded p-1 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300">
             <X className="h-5 w-5" />
           </button>
         </div>
