@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Ban, BadgeCheck, LogIn, LogOut, Pencil, Trash2, Wrench } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, Ban, BadgeCheck, LogIn, LogOut, Pencil, QrCode, Trash2, Wrench } from 'lucide-react';
 import { useData } from '../context/DataContext.jsx';
 import StatusBadge from '../components/ui/StatusBadge.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import ConfirmModal from '../components/ui/ConfirmModal.jsx';
 import DeleteEventButton from '../components/ui/DeleteEventButton.jsx';
+import ActorBadge from '../components/ui/ActorBadge.jsx';
+import { registeredBy } from '../lib/audit.js';
 import { EVENT_STYLES } from '../components/dashboard/RecentActivity.jsx';
 import AssetFormModal from '../components/forms/AssetFormModal.jsx';
 import CheckOutForm from '../components/forms/CheckOutForm.jsx';
@@ -12,6 +14,7 @@ import CheckInForm from '../components/forms/CheckInForm.jsx';
 import MaintenanceForm from '../components/forms/MaintenanceForm.jsx';
 import RetireForm from '../components/forms/RetireForm.jsx';
 import CompleteMaintenanceModal from '../components/forms/CompleteMaintenanceModal.jsx';
+import QrLabelModal from '../components/qr/QrLabelModal.jsx';
 import { CATEGORIES, MAINTENANCE_KINDS } from '../lib/status.js';
 import { fmtDate, fmtDateTime, fmtDuration } from '../lib/format.js';
 import { canDelete, describeEvent } from '../services/rules.js';
@@ -26,10 +29,22 @@ function Info({ label, children }) {
   );
 }
 
-export default function AssetDetailPage({ tag }) {
+// `autoMove` (link do QR Code: #/ativos/TAG?mover=1): abre direto a retirada (ativo disponível)
+// ou a devolução (ativo em uso) para quem tem permissão de movimentar — o caminho rápido do celular.
+export default function AssetDetailPage({ tag, autoMove = false }) {
   const { data, actions, getAsset, sectorName, can } = useData();
   const [modal, setModal] = useState(null);
   const asset = getAsset(tag);
+  const autoDone = useRef(false);
+  useEffect(() => {
+    if (!autoMove || autoDone.current || !asset) return;
+    autoDone.current = true;
+    if (can('movement')) {
+      if (asset.status === 'available') setModal('checkout');
+      else if (asset.status === 'in_use') setModal('checkin');
+    }
+    navigate(`/ativos/${encodeURIComponent(tag)}`, { replace: true }); // F5 não reabre o formulário
+  }, [autoMove, asset, can, tag]);
 
   // O estado global guarda só os eventos recentes; o histórico completo deste ativo vem sob demanda
   // (e é buscado de novo quando o ativo muda, ex.: após uma devolução).
@@ -88,6 +103,7 @@ export default function AssetDetailPage({ tag }) {
             {(s === 'available' || s === 'maintenance') && can('maintenance') && (
               <button className="btn btn-secondary" onClick={() => setModal('retire')}><Ban className="h-4 w-4" /> Baixar</button>
             )}
+            <button className="btn btn-secondary" onClick={() => setModal('qr')}><QrCode className="h-4 w-4" /> Etiqueta QR</button>
             {can('asset.edit') && (
               <button className="btn btn-secondary" onClick={() => setModal('edit')}><Pencil className="h-4 w-4" /> Editar</button>
             )}
@@ -148,6 +164,7 @@ export default function AssetDetailPage({ tag }) {
                     {fmtDateTime(e.at)}
                     {e.note ? ` · ${e.note}` : ''}
                   </p>
+                  <ActorBadge text={registeredBy(e)} className="mt-1" />
                 </div>
                 <DeleteEventButton
                   id={e.id}
@@ -174,6 +191,7 @@ export default function AssetDetailPage({ tag }) {
       </Modal>
       {modal === 'complete' && <CompleteMaintenanceModal asset={asset} onClose={close} />}
       <AssetFormModal open={modal === 'edit'} asset={asset} onClose={close} />
+      <QrLabelModal open={modal === 'qr'} asset={asset} sectorName={sectorName} onClose={close} />
       <ConfirmModal
         open={modal === 'delete'}
         title="Excluir ativo"

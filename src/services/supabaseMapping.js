@@ -1,11 +1,15 @@
 // Conversão entre linhas do banco (snake_case) e objetos do app (camelCase),
 // e tradução de erros do PostgreSQL/Supabase em ValidationError. Funções puras.
 import { ValidationError } from './rules.js';
+import { INACTIVE_MESSAGE } from '../lib/accounts.js';
 
-// Colunas lidas do banco (menos tráfego que select('*'): ex.: a coluna `actor` do histórico não é usada).
+export { INACTIVE_MESSAGE };
+
+// Colunas lidas do banco (menos tráfego que select('*'): ex.: a coluna `actor` (uuid) do histórico não é usada;
+// quem registrou a ação vem em `actor_username` / `actor_name`, copiados na hora do registro).
 export const ASSET_COLUMNS =
   'tag,name,category,serial,sector_id,notes,status,assigned_user,assigned_sector_id,assigned_since,assigned_note,maint_kind,maint_reason,maint_since,retired_reason,retired_at,created_at';
-export const EVENT_COLUMNS = 'id,tag,type,at,user_name,sector_id,kind,condition,reason,note';
+export const EVENT_COLUMNS = 'id,tag,type,at,user_name,sector_id,kind,condition,reason,note,actor_username,actor_name';
 
 const iso = (v) => (v ? new Date(v).toISOString() : null);
 
@@ -34,6 +38,9 @@ export function rowToEvent(r) {
   if (r.user_name != null) e.user = r.user_name;
   if (r.sector_id != null) e.sectorId = r.sector_id;
   for (const k of ['kind', 'condition', 'reason', 'note']) if (r[k] != null) e[k] = r[k];
+  // quem REGISTROU a ação no sistema (diferente de `user`, que é quem retirou/devolveu o ativo)
+  if (r.actor_username) e.actorUsername = r.actor_username;
+  if (r.actor_name) e.actorName = r.actor_name;
   return e;
 }
 
@@ -42,9 +49,12 @@ export const rowToUser = (r) => ({
   username: r.username ?? '',
   fullName: r.full_name ?? '',
   role: r.role,
+  isActive: r.is_active !== false, // linhas antigas (sem a coluna) contam como ativas
+  mustChangePassword: r.must_change_password === true,
   createdAt: r.created_at ? iso(r.created_at) : null,
   lastSignInAt: r.last_sign_in_at ? iso(r.last_sign_in_at) : null,
 });
+
 
 // Mensagens levantadas pelas funções RPC -> campo do formulário.
 const FIELD_HINTS = [
@@ -74,9 +84,13 @@ export function toValidationError(error) {
   if (code === '23503') {
     return new ValidationError('Este registro possui vínculos (ativos ou histórico). Mova-os antes de excluir.');
   }
+  if (code === '42703' || /column .* does not exist|could not find the '.*' column/i.test(msg)) {
+    return new ValidationError('O banco ainda não foi atualizado para esta versão. Rode a migração supabase/migrations/2026-10-v1.6.0-melhorias.sql (ou o schema.sql) no SQL Editor do Supabase e recarregue a página.');
+  }
   if (code === 'PGRST202' || code === '42883' || /could not find the function|schema cache/i.test(msg)) {
     return new ValidationError('O banco ainda não tem esta função. Rode o arquivo supabase/schema.sql de novo no SQL Editor do Supabase e tente outra vez.');
   }
+  if (/banned|inactive|inativ/i.test(msg)) return new ValidationError(INACTIVE_MESSAGE);
   if (/JWT|expired|not authenticated/i.test(msg)) {
     return new ValidationError('Sessão expirada. Entre novamente.');
   }

@@ -17,6 +17,9 @@ function fakeClient({ tables = {}, rpcs = {}, errors = {} } = {}) {
       eq: (k, v) => (state.filters.push([k, v]), b),
       gt: (k, v) => (state.filters.push(['gt:' + k, v]), b),
       gte: (k, v) => (state.filters.push(['gte:' + k, v]), b),
+      lte: (k, v) => (state.filters.push(['lte:' + k, v]), b),
+      in: (k, v) => (state.filters.push(['in:' + k, v]), b),
+      or: (v) => (state.filters.push(['or', v]), b),
       order: () => b,
       range: (a, z) => ((state.range = [a, z]), b),
       single: () => ((state.single = true), b),
@@ -190,6 +193,10 @@ function fakeAuthClient(over = {}) {
       calls.push(['updateUser', args]);
       return over.updateUser ? over.updateUser(args) : { data: {}, error: null };
     },
+    signOut: async () => {
+      calls.push(['signOut']);
+      return { error: null };
+    },
   };
   return { client, calls };
 }
@@ -206,7 +213,13 @@ test('signIn converte usuário em e-mail interno e traduz erro de credenciais', 
 
 test('getProfile devolve nome, perfil e usuário', async () => {
   const { client } = fakeAuthClient({ client: { tables: { profiles: [{ full_name: 'Ana', role: 'admin', username: 'ana' }] } } });
-  assert.deepEqual(await createSupabaseAdapter(client).auth.getProfile('u1'), { fullName: 'Ana', role: 'admin', username: 'ana' });
+  assert.deepEqual(await createSupabaseAdapter(client).auth.getProfile('u1'), {
+    fullName: 'Ana', role: 'admin', username: 'ana', isActive: true, mustChangePassword: false,
+  });
+  const flagged = fakeAuthClient({ client: { tables: { profiles: [{ full_name: 'Bia', role: 'consulta', username: 'bia', is_active: false, must_change_password: true }] } } });
+  const p = await createSupabaseAdapter(flagged.client).auth.getProfile('u2');
+  assert.equal(p.isActive, false);
+  assert.equal(p.mustChangePassword, true);
 });
 
 test('changePassword confere a senha atual antes de trocar', async () => {
@@ -237,7 +250,9 @@ test('users: chama as funções admin_* e converte as linhas', async () => {
   });
   const api = createSupabaseAdapter(client);
   assert.equal(api.capabilities.users, true);
-  assert.deepEqual(await api.users.list(), [{ id: 'u1', username: 'ana', fullName: 'Ana Lima', role: 'admin', createdAt: '2026-10-01T10:00:00.000Z', lastSignInAt: null }]);
+  assert.deepEqual(await api.users.list(), [
+    { id: 'u1', username: 'ana', fullName: 'Ana Lima', role: 'admin', isActive: true, mustChangePassword: false, createdAt: '2026-10-01T10:00:00.000Z', lastSignInAt: null },
+  ]);
   const created = await api.users.create({ username: 'bia', fullName: 'Bia', role: 'consulta', password: 'senha1234' });
   assert.equal(created.username, 'bia');
   assert.deepEqual(client.calls.find((c) => c.rpc === 'admin_create_user').args, { p_username: 'bia', p_full_name: 'Bia', p_role: 'consulta', p_password: 'senha1234' });
@@ -266,4 +281,65 @@ test('o modo local não tem gestão de usuários', async () => {
   const api = createLocalAdapter();
   assert.equal(api.users, undefined);
   assert.ok(!api.capabilities.users);
+});
+
+// ---- v1.6.0 ----
+test('signIn: conta inativa não entra (mensagem pedida) e a sessão é encerrada', async () => {
+  const inactive = fakeAuthClient({ client: { tables: { profiles: [{ is_active: false }] } } });
+  await assert.rejects(() => createSupabaseAdapter(inactive.client).auth.signIn('ana', 'senha1234'), {
+    message: 'Sua conta está inativa. Entre em contato com o administrador.',
+  });
+  assert.ok(inactive.calls.some((c) => c[0] === 'signOut'), 'a sessão aberta é encerrada');
+
+  // o bloqueio do próprio Supabase Auth (banned_until) vira a mesma mensagem
+  const banned = fakeAuthClient({ signIn: () => ({ data: null, error: { message: 'User is banned', code: 'user_banned' } }) });
+  await assert.rejects(() => createSupabaseAdapter(banned.client).auth.signIn('ana', 'x'), /conta está inativa/);
+
+  const active = fakeAuthClient({ client: { tables: { profiles: [{ is_active: true }] } } });
+  await createSupabaseAdapter(active.client).auth.signIn('ana', 'senha1234');
+  assert.ok(!active.calls.some((c) => c[0] === 'signOut'));
+});
+
+test('users.setActive chama admin_set_active e devolve o usuário', async () => {
+  const client = fakeClient({ rpcs: { admin_set_active: { id: 'u2', username: 'bia', full_name: 'Bia', role: 'consulta', is_active: false } } });
+  const api = createSupabaseAdapter(client);
+  const u = await api.users.setActive('u2', false);
+  assert.equal(u.isActive, false);
+  assert.deepEqual(client.calls.at(-1), { rpc: 'admin_set_active', args: { p_id: 'u2', p_active: false } });
+  const own = fakeClient({ errors: { admin_set_active: { code: 'P0001', message: 'Você não pode desativar a sua própria conta.' } } });
+  await assert.rejects(() => createSupabaseAdapter(own).users.setActive('eu', false), /própria conta/);
+});
+
+test('eventos trazem quem registrou a ação (e o usuário só aparece quando existe)', () => {
+  const e = rowToEvent({ id: 3, tag: 'A', type: 'checkout', at: '2026-10-20T10:00:00Z', user_name: 'Ana', actor_username: 'maria.souza', actor_name: 'Maria Souza' });
+  assert.equal(e.actorUsername, 'maria.souza');
+  assert.equal(e.actorName, 'Maria Souza');
+  assert.equal(e.user, 'Ana', 'quem retirou continua separado de quem registrou');
+  const old = rowToEvent({ id: 1, tag: 'A', type: 'created', at: '2026-10-20T10:00:00Z', actor_username: null, actor_name: null });
+  assert.ok(!('actorUsername' in old) && !('actorName' in old));
+});
+
+test('searchMovements filtra no banco por tipo, período e responsável', async () => {
+  const client = fakeClient({ tables: { events: [{ id: 9, tag: 'A', type: 'checkout', at: '2026-10-20T10:00:00Z', user_name: 'Ana', actor_username: 'maria.souza' }] } });
+  const api = createSupabaseAdapter(client);
+  const rows = await api.searchMovements({ q: '  maria, (souza)% ', from: '2026-10-01', to: '2026-10-20', limit: 25 });
+  assert.equal(rows[0].actorUsername, 'maria.souza');
+  const call = client.calls.find((c) => c.table === 'events');
+  assert.deepEqual(call.filters[0], ['in:type', ['checkout', 'checkin']]);
+  assert.equal(call.filters[1][0], 'gte:at');
+  assert.equal(call.filters[2][0], 'lte:at');
+  assert.ok(new Date(call.filters[1][1]) < new Date(call.filters[2][1]));
+  // caracteres que quebrariam a sintaxe do .or() do PostgREST (vírgula, parênteses, %) são removidos
+  assert.equal(call.filters[3][1], 'actor_username.ilike.%maria souza%,actor_name.ilike.%maria souza%,user_name.ilike.%maria souza%');
+  assert.deepEqual(call.range, [0, 24]);
+
+  const bare = fakeClient({ tables: { events: [] } });
+  await createSupabaseAdapter(bare).searchMovements();
+  assert.deepEqual(bare.calls.find((c) => c.table === 'events').filters, [['in:type', ['checkout', 'checkin']]], 'sem filtros: só o tipo');
+});
+
+test('banco sem a migração v1.6.0 (coluna inexistente): mensagem orienta o que rodar', () => {
+  const e = toValidationError({ code: '42703', message: 'column events.actor_username does not exist' });
+  assert.match(e.message, /migração|schema\.sql/);
+  assert.match(toValidationError({ message: "Could not find the 'is_active' column of 'profiles' in the schema cache" }).message, /migração/);
 });

@@ -3,10 +3,12 @@ import { X } from 'lucide-react';
 
 const SIZES = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl' };
 
-export default function Modal({ open, title, onClose, children, size = 'md' }) {
+// `dismissible={false}`: modal bloqueante — sem botão fechar, sem Esc e sem fechar clicando fora
+// (usado na troca de senha obrigatória do primeiro acesso).
+export default function Modal({ open, title, onClose, children, size = 'md', dismissible = true }) {
   useEffect(() => {
     if (!open) return undefined;
-    const onKey = (e) => e.key === 'Escape' && onClose();
+    const onKey = (e) => e.key === 'Escape' && dismissible && onClose();
     document.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -14,13 +16,13 @@ export default function Modal({ open, title, onClose, children, size = 'md' }) {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prev;
     };
-  }, [open, onClose]);
+  }, [open, onClose, dismissible]);
 
   if (!open) return null;
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 sm:items-center sm:p-4"
-      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+      onMouseDown={(e) => e.target === e.currentTarget && dismissible && onClose()}
     >
       <div
         role="dialog"
@@ -30,9 +32,11 @@ export default function Modal({ open, title, onClose, children, size = 'md' }) {
       >
         <div className="card-header">
           <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">{title}</h2>
-          <button onClick={onClose} aria-label="Fechar" className="rounded p-1 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300">
-            <X className="h-5 w-5" />
-          </button>
+          {dismissible && (
+            <button onClick={onClose} aria-label="Fechar" className="rounded p-1 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300">
+              <X className="h-5 w-5" />
+            </button>
+          )}
         </div>
         <div className="overflow-y-auto p-4">{children}</div>
       </div>

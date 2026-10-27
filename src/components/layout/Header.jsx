@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Search, Plus, Menu, LogOut, KeyRound } from 'lucide-react';
+import { Suspense, lazy, useEffect, useState } from 'react';
+import { Search, Plus, Menu, LogOut, KeyRound, ScanLine } from 'lucide-react';
 import ThemeToggle from '../ui/ThemeToggle.jsx';
 import ChangePasswordModal from '../ui/ChangePasswordModal.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -7,9 +7,13 @@ import { useData } from '../../context/DataContext.jsx';
 import { ROLES } from '../../lib/permissions.js';
 import { buildQuery, navigate } from '../../router/hashRouter.js';
 
+// O leitor (e a biblioteca da câmera) só é baixado na primeira vez que o botão é usado.
+const QrScannerModal = lazy(() => import('../qr/QrScannerModal.jsx'));
+
 export default function Header({ title, onMenu, searchValue, hideSearch = false }) {
   const { user, fullName, username, role, signOut, changePassword } = useAuth();
   const [pwOpen, setPwOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
   const { can } = useData();
   const [q, setQ] = useState(searchValue || '');
   useEffect(() => setQ(searchValue || ''), [searchValue]);
@@ -39,6 +43,10 @@ export default function Header({ title, onMenu, searchValue, hideSearch = false 
       </form>
       )}
       <div className="ml-auto flex items-center gap-2">
+        <button type="button" onClick={() => setScanOpen(true)} className="btn btn-secondary" aria-label="Escanear QR Code de um ativo" title="Escanear QR Code de um ativo">
+          <ScanLine className="h-4 w-4" />
+          <span className="hidden sm:inline">Escanear</span>
+        </button>
         {can('asset.create') && (
           <a href="#/ativos?novo=1" className="btn btn-primary">
             <Plus className="h-4 w-4" />
@@ -65,6 +73,11 @@ export default function Header({ title, onMenu, searchValue, hideSearch = false 
         )}
       </div>
       <ChangePasswordModal open={pwOpen} onClose={() => setPwOpen(false)} />
+      {scanOpen && (
+        <Suspense fallback={null}>
+          <QrScannerModal open onClose={() => setScanOpen(false)} />
+        </Suspense>
+      )}
     </header>
   );
 }

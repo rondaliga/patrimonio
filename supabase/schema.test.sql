@@ -23,6 +23,10 @@ begin
 end $$;
 create function t.pw_ok(p_email text, p_pw text) returns boolean language sql security definer as
 $$ select encrypted_password = extensions.crypt(p_pw, encrypted_password) from auth.users where email = p_email $$;
+create function t.set_pw(p_id uuid, p_pw text) returns void language sql security definer as
+$$ update auth.users set encrypted_password = extensions.crypt(p_pw, extensions.gen_salt('bf')) where id = p_id $$;
+create function t.banned(p_user uuid) returns boolean language sql security definer as
+$$ select banned_until is not null and banned_until > now() + interval '10 years' from auth.users where id = p_user $$;
 create function t.auth_ok(p_email text) returns boolean language sql security definer as
 $$ select email_confirmed_at is not null and aud = 'authenticated' and role = 'authenticated'
           and confirmation_token = '' and recovery_token = '' and email_change = '' and email_change_token_new = ''
@@ -177,6 +181,62 @@ select public.admin_delete_user((select id from public.profiles where username =
 select t.ok((select count(*) from public.profiles where username = 'maria.souza') = 0 and t.auth_count('maria.souza@%') = 0, 'excluir remove conta e perfil');
 select t.fails($$select public.admin_delete_user('00000000-0000-0000-0000-00000000ffff')$$, 'não encontrado', 'excluir usuário inexistente');
 select t.ok((select count(*) from public.events where actor is not null) > 0, 'histórico feito pelo usuário excluído permanece');
+
+\echo == v1.6.0: SENHA TEMPORÁRIA, CONTA ATIVA/INATIVA E AUTORIA
+select public.admin_create_user('joana.lima', 'Joana Lima', 'enfermagem', 'temporaria1') as j \gset
+select id as joana from public.profiles where username = 'joana.lima' \gset
+select t.ok((select must_change_password and is_active from public.profiles where id = :'joana'), 'conta nova nasce ativa e com troca de senha obrigatória');
+select t.ok((select must_change_password and is_active from public.admin_list_users() where username = 'joana.lima'), 'admin_list_users informa ativo e troca pendente');
+reset role;
+select t.set_pw(:'joana', 'minhanova123');   -- a própria pessoa troca a senha (Auth atualiza encrypted_password)
+set local role authenticated;
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select t.ok((select not must_change_password from public.profiles where id = :'joana'), 'trocar a senha limpa a marca de troca obrigatória');
+select public.admin_set_password(:'joana', 'redefinida99');
+select t.ok((select must_change_password from public.profiles where id = :'joana'), 'senha redefinida pelo admin volta a ser temporária');
+reset role;
+select t.set_pw(:'joana', 'definitiva123');
+set local role authenticated;
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select t.ok((select not must_change_password from public.profiles where id = :'joana'), 'nova troca da própria pessoa limpa a marca de novo');
+select public.admin_set_password('00000000-0000-0000-0000-0000000000a1', 'minhasenha123');
+select t.ok((select not must_change_password from public.profiles where id = '00000000-0000-0000-0000-0000000000a1'), 'admin redefinindo a PRÓPRIA senha não fica com troca obrigatória');
+select t.login(:'joana');
+select t.fails($$update public.profiles set must_change_password = false, is_active = true where id = auth.uid()$$, 'permission denied|row-level', 'ninguém altera a marca/ativo pela API direta');
+select t.login('00000000-0000-0000-0000-0000000000a1');
+
+-- autoria: o histórico guarda quem registrou (cópia do nome, sobrevive à exclusão da conta)
+select public.admin_update_user(:'joana', 'Joana Lima', 'enfermagem');
+insert into public.assets(tag,name,category,sector_id) values ('RAD-0777','Rádio autoria','radio','uti');
+select public.checkout_asset('RAD-0777', 'Setor UTI', 'uti', 'teste de autoria') is not null as retirou \gset
+select t.login(:'joana');
+select public.checkin_asset('RAD-0777', 'ok', 'devolvido pela Joana');
+select t.ok((select actor_username = 'joana.lima' and actor_name = 'Joana Lima' and actor = :'joana' from public.events where tag = 'RAD-0777' and type = 'checkin' order by id desc limit 1), 'devolução grava quem registrou (usuário e nome)');
+select t.ok((select actor_name = 'Administrador Geral' from public.events where tag = 'RAD-0777' and type = 'checkout' order by id desc limit 1), 'retirada grava o nome de quem registrou');
+
+-- desativação
+select t.login('00000000-0000-0000-0000-0000000000c3');
+select t.fails($$select public.admin_set_active(null, false)$$, 'Sem permissão', 'enfermagem não ativa/desativa contas');
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select t.fails($$select public.admin_set_active('00000000-0000-0000-0000-0000000000a1', false)$$, 'própria conta', 'admin não desativa a si mesmo');
+select t.fails($$select public.admin_set_active('00000000-0000-0000-0000-00000000ffff', false)$$, 'não encontrado', 'desativar usuário inexistente');
+select t.add_session(:'joana');
+select t.ok((select not is_active from public.admin_set_active(:'joana', false)), 'admin desativa a conta');
+select t.ok(t.banned(:'joana'), 'login bloqueado no Auth (banned_until)');
+select t.ok(t.sessions(:'joana') = 0, 'sessões abertas da pessoa encerradas');
+select t.ok((select count(*) from public.events where actor = :'joana') > 0, 'histórico da pessoa permanece intacto');
+select t.ok((select not is_active from public.admin_list_users() where username = 'joana.lima'), 'lista mostra a conta como inativa');
+select t.login(:'joana');
+select t.ok((select not is_active from public.profiles where id = auth.uid()), 'conta inativa ainda lê o próprio perfil (para mostrar o aviso)');
+select t.ok((select count(*) from public.assets) = 0 and (select count(*) from public.events) = 0 and (select count(*) from public.sectors) = 0, 'conta inativa não lê ativos, histórico nem setores');
+select t.fails($$select public.checkout_asset('RAD-0001','Ana','uti')$$, 'Sem permissão', 'conta inativa não movimenta');
+select t.ok(public.app_role() is null, 'conta inativa não tem papel');
+select t.login('00000000-0000-0000-0000-0000000000a1');
+select t.ok((select is_active from public.admin_set_active(:'joana', true)), 'admin reativa a conta');
+select t.ok(not t.banned(:'joana'), 'login liberado de novo no Auth');
+select t.login(:'joana');
+select t.ok(public.app_role() = 'enfermagem' and (select count(*) from public.assets) > 0, 'conta reativada volta a ter o mesmo papel e acesso');
+select t.login('00000000-0000-0000-0000-0000000000a1');
 
 \echo == ANÔNIMO
 reset role; set local role anon;

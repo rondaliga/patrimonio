@@ -42,7 +42,7 @@ function resolve(path, query) {
   const detail = /^\/ativos\/([^/]+)$/.exec(path);
   if (detail) {
     const tag = decodeURIComponent(detail[1]);
-    return { title: `Ativo ${tag}`, element: <AssetDetailPage key={tag} tag={tag} /> };
+    return { title: `Ativo ${tag}`, element: <AssetDetailPage key={tag} tag={tag} autoMove={query.mover === '1'} /> };
   }
   switch (path) {
     case '/':

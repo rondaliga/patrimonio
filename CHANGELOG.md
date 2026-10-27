@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.6.0 — senha no 1º acesso, desativar usuários, autoria, atrasados, QR Code e filtros
+- **Troca de senha obrigatória**: conta criada pelo administrador (ou com senha redefinida por ele) abre um modal bloqueante — sem fechar, sem Esc — até a pessoa definir a própria senha. O banco só limpa a marca (`profiles.must_change_password`) quando a senha realmente muda (gatilho em `auth.users`).
+- **Desativar usuário sem excluir**: botão Ativo/Inativo na tela Usuários (`profiles.is_active`, função `admin_set_active`). Conta inativa não entra ("Sua conta está inativa. Entre em contato com o administrador."), perde as sessões abertas e não lê nem grava nada (RLS). O histórico fica intacto. O administrador não desativa a si mesmo.
+- **Autoria visível**: cada evento guarda quem o registrou (`events.actor_username` / `actor_name`, copiados na hora — sobrevivem à exclusão da conta). Aparece como "Retirada registrada por maria.souza" na atividade recente, nas movimentações e no histórico do ativo. Eventos antigos são preenchidos pela coluna `actor` que já existia.
+- **Empréstimos críticos** (mais de 12 h fora): faixa vermelha no topo do painel, card "Empréstimos críticos" e selo "Atrasado" na tabela de empréstimos ativos. O relógio atualiza a cada minuto.
+- **QR Code**: "Etiqueta QR" no ativo (imprimir/copiar link) e botão "Escanear" no topo (câmera, com digitação como alternativa). O QR leva a `#/ativos/TAG?mover=1`, que abre direto a retirada ou a devolução. Novas dependências: `qrcode.react` e `html5-qrcode` (carregada só ao abrir o leitor) — **rode `npm install`**.
+- **Movimentações**: busca por responsável (nome ou usuário), Data início/Data fim e "Carregar mais"; os filtros rodam no banco.
+- Banco: **rode `supabase/schema.sql` de novo** ou, em instalação existente, `supabase/migrations/2026-10-v1.6.0-melhorias.sql`. Testes SQL e 96 testes automáticos cobrem as regras novas.
+
 ## 1.5.0 — usuários, senhas, login por usuário e tema escuro
 - **Login por nome de usuário** (não mais por e-mail). Contas antigas ganham como usuário a parte do e-mail antes do `@` e mantêm a senha (o `schema.sql` faz a migração ao ser rodado de novo).
 - **Tela Usuários** (menu, só administrador): criar conta (nome, usuário, perfil, senha com botão "Gerar"), editar nome e perfil, redefinir a senha de outra pessoa e excluir. O administrador não exclui a si mesmo nem se rebaixa.

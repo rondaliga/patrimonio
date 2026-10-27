@@ -87,3 +87,11 @@ no GitHub Pages. **O código já está pronto**: `supabaseAdapter.js`, tela de l
   Crie um usuário de teste, entre com ele e confira. Se algo falhar, crie a conta pelo painel (Authentication → Users) usando o e-mail
   `usuario@patrimonio.invalid` e ajuste o perfil em **Usuários**.
 - Sem e-mail não há "esqueci minha senha": quem esquecer pede ao administrador (ícone de chave na linha da pessoa).
+
+## Atualização para a v1.6.0
+
+1. No SQL Editor do Supabase rode **`supabase/migrations/2026-10-v1.6.0-melhorias.sql`** (ou o `schema.sql` inteiro de novo). Pode repetir sem erro.
+2. Contas já existentes continuam ativas e sem troca de senha obrigatória. Só contas criadas/redefinidas a partir de agora pedem a troca no primeiro acesso.
+3. O bloqueio de contas inativas usa `auth.users.banned_until` (login recusado pelo Supabase) **e** a RLS. Se reativar, a pessoa volta a entrar normalmente.
+4. QR Code: o link gravado na etiqueta usa o endereço atual do site (`https://usuario.github.io/repo/#/ativos/TAG?mover=1`). Se o endereço do site mudar, reimprima as etiquetas. A câmera exige HTTPS (o GitHub Pages já é).
+5. Teste local do SQL: `createdb hosp && psql -d hosp -q -v ON_ERROR_STOP=1 -f supabase/mock-auth.sql -f supabase/schema.sql && psql -d hosp -q -t -A -f supabase/schema.test.sql`.

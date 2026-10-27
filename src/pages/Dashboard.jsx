@@ -1,16 +1,22 @@
-import { Boxes, BadgeCheck, ArrowLeftRight, Wrench, Radio, Accessibility } from 'lucide-react';
+import { Boxes, BadgeCheck, ArrowLeftRight, Wrench, Radio, Accessibility, BellRing } from 'lucide-react';
 import MetricCard from '../components/dashboard/MetricCard.jsx';
 import SectorBarChart from '../components/dashboard/SectorBarChart.jsx';
 import StatusDonut from '../components/dashboard/StatusDonut.jsx';
 import WeeklyLoansChart from '../components/dashboard/WeeklyLoansChart.jsx';
 import ActiveLoansTable from '../components/dashboard/ActiveLoansTable.jsx';
 import RecentActivity from '../components/dashboard/RecentActivity.jsx';
+import OverdueLoansAlert from '../components/dashboard/OverdueLoansAlert.jsx';
 import { useData } from '../context/DataContext.jsx';
 import { describeEvent } from '../services/rules.js';
+import { overdueLoans } from '../services/stats.js';
+import { LONG_LOAN_HOURS } from '../lib/status.js';
+import { registeredBy } from '../lib/audit.js';
+import { useNow } from '../lib/useNow.js';
 
 export default function Dashboard() {
   const { data, actions, sectorName, can, capabilities, getStats } = useData();
   const stats = getStats(); // calculado uma vez por versão dos dados (compartilhado com outras páginas)
+  const now = useNow(); // reavalia a cada minuto: o empréstimo vira "crítico" mesmo sem nenhum dado novo
 
   if (data.assets.length === 0) {
     return (
@@ -37,10 +43,14 @@ export default function Dashboard() {
     text: describeEvent(e, e.sectorId ? sectorName(e.sectorId) : ''),
     sector: e.sectorId ? sectorName(e.sectorId) : '',
     at: e.at,
+    by: registeredBy(e),
   }));
+  const critical = overdueLoans(stats.activeLoans, now);
 
   return (
     <div className="space-y-6">
+      <OverdueLoansAlert loans={critical} now={now} />
+
       {/* Linha 1 — métricas rápidas */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Total de ativos" value={stats.total} hint="em todos os setores" icon={Boxes} tone="slate" href="#/ativos" />
@@ -50,7 +60,15 @@ export default function Dashboard() {
       </section>
 
       {/* Linha 2 — itens compartilhados em destaque */}
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <MetricCard
+          label="Empréstimos críticos"
+          value={critical.length}
+          hint={critical.length ? `fora há mais de ${LONG_LOAN_HOURS} h` : `nenhum fora há mais de ${LONG_LOAN_HOURS} h`}
+          icon={BellRing}
+          tone={critical.length ? 'red' : 'green'}
+          href="#/ativos?status=in_use"
+        />
         <MetricCard label="Rádios emprestados" value={stats.radiosLoaned} hint="rádios comunicadores em uso" icon={Radio} tone="blue" href="#/ativos?categoria=radio&status=in_use" />
         <MetricCard label="Cadeiras de rodas alocadas" value={stats.chairsLoaned} hint="fora do estoque central" icon={Accessibility} tone="blue" href="#/ativos?categoria=wheelchair&status=in_use" />
       </section>
@@ -63,7 +81,7 @@ export default function Dashboard() {
 
       {/* Linha 4 — operação */}
       <section>
-        <ActiveLoansTable loans={stats.activeLoans} />
+        <ActiveLoansTable loans={stats.activeLoans} now={now} />
       </section>
 
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-3">

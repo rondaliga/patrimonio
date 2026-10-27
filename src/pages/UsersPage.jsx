@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { KeyRound, Pencil, RefreshCw, Trash2, UserPlus } from 'lucide-react';
+import { fmtActive } from '../lib/format.js';
 import { useData } from '../context/DataContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
@@ -57,6 +58,19 @@ export default function UsersPage() {
     return <div className="card p-8 text-center text-sm text-slate-600 dark:text-slate-300">Somente administradores podem gerenciar usuários.</div>;
   }
 
+  // Liga/desliga a conta (férias, licença…) sem apagar nada. Atualiza a linha na hora; reverte se o banco recusar.
+  const toggleActive = async (u) => {
+    const next = !u.isActive;
+    setList((l) => l.map((x) => (x.id === u.id ? { ...x, isActive: next } : x)));
+    try {
+      await users.setActive(u.id, next);
+      toast.success(`${u.fullName || u.username} ${next ? 'reativado(a)' : 'desativado(a): não consegue mais entrar, o histórico foi mantido'}.`);
+    } catch (e) {
+      setList((l) => l.map((x) => (x.id === u.id ? { ...x, isActive: u.isActive } : x)));
+      toast.error(e.message);
+    }
+  };
+
   const close = () => setModal(null);
   const done = (message) => {
     toast.success(message);
@@ -90,6 +104,7 @@ export default function UsersPage() {
                   <th>Nome</th>
                   <th>Usuário</th>
                   <th>Perfil</th>
+                  <th>Situação</th>
                   <th className="hidden md:table-cell">Último acesso</th>
                   <th className="text-right">Ações</th>
                 </tr>
@@ -98,14 +113,32 @@ export default function UsersPage() {
                 {list.map((u) => {
                   const me = u.id === userId;
                   return (
-                    <tr key={u.id}>
+                    <tr key={u.id} className={u.isActive ? '' : 'bg-slate-50/70 dark:bg-slate-800/30 text-slate-500 dark:text-slate-400'}>
                       <td className="font-medium">
                         {u.fullName || '—'}
+                        {u.mustChangePassword && <span className="ml-2 rounded bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-800 dark:text-amber-200" title="Ainda não trocou a senha temporária">Senha temporária</span>}
                         {me && <span className="ml-2 rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-600 dark:text-slate-300">Você</span>}
                       </td>
                       <td className="font-mono text-xs">{u.username || '—'}</td>
                       <td>
                         <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${ROLE_BADGE[u.role] ?? ROLE_BADGE.consulta}`}>{ROLES[u.role] ?? u.role}</span>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={u.isActive}
+                          aria-label={`${u.isActive ? 'Desativar' : 'Reativar'} ${u.fullName || u.username}`}
+                          title={me ? 'Você não pode desativar a sua própria conta' : u.isActive ? 'Desativar (a conta não é excluída)' : 'Reativar'}
+                          disabled={me}
+                          onClick={() => toggleActive(u)}
+                          className={`inline-flex items-center gap-2 rounded-full text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50`}
+                        >
+                          <span className={`relative inline-block h-5 w-9 shrink-0 rounded-full transition-colors ${u.isActive ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}>
+                            <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${u.isActive ? 'left-[1.125rem]' : 'left-0.5'}`} />
+                          </span>
+                          <span className={u.isActive ? 'text-emerald-700 dark:text-emerald-300' : ''}>{fmtActive(u.isActive)}</span>
+                        </button>
                       </td>
                       <td className="hidden text-slate-600 dark:text-slate-300 md:table-cell">{dateTime(u.lastSignInAt)}</td>
                       <td className="text-right">
@@ -166,7 +199,7 @@ export default function UsersPage() {
       <ConfirmModal
         open={modal?.kind === 'delete'}
         title="Excluir usuário"
-        message={`Excluir a conta de ${modal?.user?.fullName || modal?.user?.username}? A pessoa perde o acesso na hora. O histórico de movimentações permanece.`}
+        message={`Excluir a conta de ${modal?.user?.fullName || modal?.user?.username}? A pessoa perde o acesso na hora. O histórico de movimentações permanece. Para um afastamento temporário (férias, licença), prefira desativar a conta.`}
         confirmLabel="Excluir"
         danger
         onClose={close}
@@ -252,7 +285,7 @@ function UserFormModal({ open, user, isSelf, users, onClose, onDone }) {
           {isSelf && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Você não pode tirar o seu próprio acesso de administrador.</p>}
         </Field>
         {!editing && (
-          <Field label="Senha inicial" htmlFor="u-password" error={errors.password} hint="Pelo menos 8 caracteres. Passe a senha para a pessoa; ela pode trocá-la depois.">
+          <Field label="Senha inicial" htmlFor="u-password" error={errors.password} hint="Pelo menos 8 caracteres. Passe a senha para a pessoa: no primeiro acesso o sistema obriga a trocá-la.">
             <div className="flex gap-2">
               <div className="flex-1"><PasswordInput id="u-password" value={f.password} onChange={set('password')} error={errors.password} /></div>
               <button type="button" className="btn btn-secondary" onClick={() => set('password')(generatePassword())}>Gerar</button>
@@ -301,7 +334,7 @@ function ResetPasswordModal({ open, user, users, onClose, onDone }) {
     <Modal open={open} title="Redefinir senha" onClose={onClose} size="sm">
       <form onSubmit={submit} noValidate className="space-y-3">
         <p className="text-sm text-slate-600 dark:text-slate-300">
-          Nova senha para <strong>{user?.fullName || user?.username}</strong>. As sessões abertas dessa pessoa são encerradas e ela entra de novo com a senha nova.
+          Nova senha para <strong>{user?.fullName || user?.username}</strong>. As sessões abertas dessa pessoa são encerradas e ela entra de novo com a senha nova — que será pedida para trocar no próximo acesso.
         </p>
         <Field label="Nova senha" htmlFor="rp-password" error={error} hint="Pelo menos 8 caracteres.">
           <div className="flex gap-2">

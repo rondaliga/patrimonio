@@ -62,3 +62,21 @@
     @apply border-red-400 focus:border-red-500 focus:ring-red-500/20 dark:border-red-500;
   }
 }
+
+/* Impressão da etiqueta QR (Ativo → Etiqueta QR → Imprimir): some tudo, fica só a etiqueta. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-label,
+  .print-label * {
+    visibility: visible;
+  }
+  .print-label {
+    position: fixed;
+    left: 0;
+    top: 0;
+    margin: 0;
+    box-shadow: none;
+  }
+}

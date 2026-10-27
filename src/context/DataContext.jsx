@@ -134,6 +134,7 @@ export function DataProvider({ children, api }) {
       // Consultas sob demanda (o estado só guarda os eventos recentes)
       eventsFor: (tag) => api.eventsFor(tag),
       allEvents: () => api.allEvents(),
+      searchMovements: (filters) => api.searchMovements(filters),
       countEvents: () => api.countEvents(),
     };
   }, [api, commit, pullEvents, refresh, toast]);

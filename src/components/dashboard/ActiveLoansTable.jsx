@@ -3,7 +3,7 @@ import EmptyState from '../ui/EmptyState.jsx';
 import { CATEGORIES, LONG_LOAN_HOURS } from '../../lib/status.js';
 import { fmtDateTime, fmtDuration, hoursSince } from '../../lib/format.js';
 
-export default function ActiveLoansTable({ loans }) {
+export default function ActiveLoansTable({ loans, now = new Date() }) {
   return (
     <div className="card">
       <div className="card-header">
@@ -27,9 +27,9 @@ export default function ActiveLoansTable({ loans }) {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {loans.slice(0, 12).map((l) => {
-                const long = hoursSince(l.since) > LONG_LOAN_HOURS;
+                const long = hoursSince(l.since, now) > LONG_LOAN_HOURS; // crítico: fora há mais de 12 h
                 return (
-                  <tr key={l.tag} className="hover:bg-slate-50 dark:hover:bg-slate-800">
+                  <tr key={l.tag} className={long ? 'bg-red-50/70 dark:bg-red-950/30 hover:bg-red-50 dark:hover:bg-red-950/50' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}>
                     <td>
                       <a href={`#/ativos/${encodeURIComponent(l.tag)}`} className="font-mono text-xs font-semibold text-brand-700 dark:text-sky-300 hover:underline">
                         {l.tag}
@@ -37,6 +37,7 @@ export default function ActiveLoansTable({ loans }) {
                     </td>
                     <td>
                       {l.asset}
+                      {long && <span className="ml-2 rounded-full bg-red-600 px-2 py-0.5 align-middle text-[10px] font-semibold uppercase text-white">Atrasado</span>}
                       <span className="block text-[11px] text-slate-500 dark:text-slate-400">{CATEGORIES[l.category]}</span>
                       <span className="block text-[11px] text-slate-500 dark:text-slate-400 md:hidden">{l.user} · {l.sector}</span>
                     </td>
@@ -44,8 +45,8 @@ export default function ActiveLoansTable({ loans }) {
                     <td className="hidden md:table-cell">{l.sector}</td>
                     <td className="whitespace-nowrap text-slate-500 dark:text-slate-400">
                       <span className="hidden md:inline">{fmtDateTime(l.since)}</span>
-                      <span className={`block text-[11px] ${long ? 'font-medium text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'}`}>
-                        há {fmtDuration(l.since)}
+                      <span className={`block text-[11px] ${long ? 'font-semibold text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                        há {fmtDuration(l.since, now)}
                       </span>
                     </td>
                     <td className="text-right">

@@ -3,7 +3,8 @@ import { HeartPulse } from 'lucide-react';
 import { Field, FormError, inputClass } from '../components/ui/Field.jsx';
 import PasswordInput from '../components/ui/PasswordInput.jsx';
 import ThemeToggle from '../components/ui/ThemeToggle.jsx';
-import { usernameFromEmail } from '../lib/accounts.js';
+import ChangePasswordModal from '../components/ui/ChangePasswordModal.jsx';
+import { INACTIVE_MESSAGE, usernameFromEmail } from '../lib/accounts.js';
 
 const AuthContext = createContext({ user: null, userId: null, role: 'admin', fullName: '', username: '', signOut: null, changePassword: null });
 
@@ -22,12 +23,20 @@ export function AuthProvider({ children, api }) {
     async (session) => {
       if (!session) {
         loadedUser.current = null;
-        return setState({ loading: false, session: null, profile: null, error: '' });
+        // mantém o aviso de conta inativa: o signOut que fazemos abaixo também chega aqui como "sem sessão"
+        return setState((s) => ({ loading: false, session: null, profile: null, error: s?.error || '' }));
       }
       if (loadedUser.current === session.user.id) return;
       loadedUser.current = session.user.id;
       try {
         const profile = await auth.getProfile(session.user.id);
+        if (profile.isActive === false) {
+          // conta desativada pelo administrador: não entra (e uma sessão que já estava aberta cai)
+          loadedUser.current = null;
+          setState({ loading: false, session: null, profile: null, error: INACTIVE_MESSAGE });
+          auth.signOut().catch(() => {});
+          return;
+        }
         setState({ loading: false, session, profile, error: '' });
       } catch (e) {
         loadedUser.current = null;
@@ -58,13 +67,29 @@ export function AuthProvider({ children, api }) {
       fullName: state.profile.fullName,
       username: state.profile.username || usernameFromEmail(state.session.user.email),
       signOut: () => auth.signOut(),
-      changePassword: (current, next) => auth.changePassword(current, next),
+      changePassword: async (current, next) => {
+        await auth.changePassword(current, next);
+        // o banco limpa a marca de "senha temporária" quando a senha muda: relê o perfil e libera o app
+        const fresh = await auth.getProfile(state.session.user.id).catch(() => state.profile);
+        setState((s) => ({ ...s, profile: { ...fresh, mustChangePassword: false } }));
+      },
     };
   }, [auth, state]);
 
   if (!auth) return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
   if (state.loading) return <div className="p-6 text-sm text-slate-500 dark:text-slate-400">Carregando…</div>;
   if (!state.session) return <LoginScreen auth={auth} initialError={state.error} />;
+  // Primeiro acesso / senha redefinida pelo administrador: nada do app aparece até a senha ser trocada.
+  if (state.profile.mustChangePassword) {
+    return (
+      <AuthContext.Provider value={value}>
+        <div className="flex min-h-screen items-center justify-center p-4">
+          <div className="fixed right-4 top-4"><ThemeToggle /></div>
+          <ChangePasswordModal open forced />
+        </div>
+      </AuthContext.Provider>
+    );
+  }
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
@@ -73,6 +98,10 @@ function LoginScreen({ auth, initialError }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(initialError || '');
   const [busy, setBusy] = useState(false);
+  // o aviso pode chegar depois da tela aparecer (ex.: conta desativada com a sessão ainda aberta)
+  useEffect(() => {
+    if (initialError) setError(initialError);
+  }, [initialError]);
 
   const submit = async (e) => {
     e.preventDefault();

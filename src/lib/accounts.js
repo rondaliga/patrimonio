@@ -9,6 +9,9 @@ export const USERNAME_RE = /^[a-z0-9][a-z0-9._-]{2,29}$/;
 export const PASSWORD_MIN = 8;
 export const PASSWORD_MAX = 72; // limite do bcrypt
 
+// Mensagem exibida quando uma conta desativada tenta entrar.
+export const INACTIVE_MESSAGE = 'Sua conta está inativa. Entre em contato com o administrador.';
+
 export const normalizeUsername = (v) => String(v ?? '').trim().toLowerCase();
 
 // Quem digita um e-mail (conta antiga) continua entrando; o resto vira usuario@dominio-interno.

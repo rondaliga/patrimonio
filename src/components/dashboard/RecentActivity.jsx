@@ -1,6 +1,7 @@
 import { LogOut, LogIn, Wrench, Droplets, Ban, Plus, Pencil, BadgeCheck } from 'lucide-react';
 import EmptyState from '../ui/EmptyState.jsx';
 import DeleteEventButton from '../ui/DeleteEventButton.jsx';
+import ActorBadge from '../ui/ActorBadge.jsx';
 import { fmtDateTime } from '../../lib/format.js';
 
 export const EVENT_STYLES = {
@@ -24,7 +25,7 @@ export default function RecentActivity({ items }) {
         <EmptyState title="Sem atividade ainda" />
       ) : (
         <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-          {items.map(({ id, type, tag, text, sector, at }) => {
+          {items.map(({ id, type, tag, text, sector, at, by }) => {
             const { icon: Icon, color } = EVENT_STYLES[type] ?? EVENT_STYLES.edited;
             return (
               <li key={id} className="flex items-start gap-3 px-4 py-3">
@@ -42,6 +43,7 @@ export default function RecentActivity({ items }) {
                     {sector ? `${sector} · ` : ''}
                     {fmtDateTime(at)}
                   </p>
+                  <ActorBadge text={by} className="mt-1" />
                 </div>
                 <DeleteEventButton id={id} label={`${tag} — ${text}`} />
               </li>

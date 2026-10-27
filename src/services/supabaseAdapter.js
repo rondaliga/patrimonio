@@ -3,7 +3,8 @@
 import { ValidationError, normalizeAssetInput } from './rules.js';
 import { slugify } from '../lib/format.js';
 import { loginEmail } from '../lib/accounts.js';
-import { ASSET_COLUMNS, EVENT_COLUMNS, assetToInsert, rowToAsset, rowToEvent, rowToUser, toValidationError } from './supabaseMapping.js';
+import { dayRange } from '../lib/format.js';
+import { ASSET_COLUMNS, EVENT_COLUMNS, INACTIVE_MESSAGE, assetToInsert, rowToAsset, rowToEvent, rowToUser, toValidationError } from './supabaseMapping.js';
 
 const DB_VERSION = 1;
 const PAGE = 1000; // limite padrão do PostgREST por requisição
@@ -106,6 +107,25 @@ export function createSupabaseAdapter(client, { now = () => new Date() } = {}) {
       return (await fetchAll('events', EVENT_COLUMNS, 'id', (q) => q.gt('id', id))).map(rowToEvent);
     },
 
+    // Histórico de retiradas/devoluções com filtros (responsável e período), mais recentes primeiro.
+    //   q: nome/usuário de quem registrou a ação OU de quem retirou/devolveu o ativo
+    //   from/to: datas 'AAAA-MM-DD' (dia inteiro, no horário local)
+    // Os filtros rodam no banco (.gte/.lte em `at`, .or/ilike nos nomes); `offset`/`limit` paginam.
+    async searchMovements({ q = '', from = '', to = '', limit = 50, offset = 0 } = {}) {
+      const { start, end } = dayRange(from, to);
+      let query = client.from('events').select(EVENT_COLUMNS).in('type', ['checkout', 'checkin']);
+      if (start) query = query.gte('at', start);
+      if (end) query = query.lte('at', end);
+      // `,` `(` `)` têm significado na sintaxe do filtro .or() do PostgREST; `%` `_` `\` são curingas do LIKE
+      const term = text(q).trim().replace(/[,()*%_\\]/g, ' ').replace(/\s+/g, ' ').trim();
+      if (term) {
+        const like = `%${term}%`;
+        query = query.or(`actor_username.ilike.${like},actor_name.ilike.${like},user_name.ilike.${like}`);
+      }
+      const rows = await run(query.order('at', { ascending: false }).order('id', { ascending: false }).range(offset, offset + limit - 1));
+      return rows.map(rowToEvent);
+    },
+
     async allEvents() {
       return (await fetchAll('events', EVENT_COLUMNS, 'id')).map(rowToEvent);
     },
@@ -181,6 +201,13 @@ export function createSupabaseAdapter(client, { now = () => new Date() } = {}) {
             /invalid|credentials/i.test(error.message) ? 'Usuário ou senha incorretos.' : toValidationError(error).message
           );
         }
+        // Conta desativada pelo administrador: o Auth já recusa (banned_until), e esta checagem cobre
+        // contas desativadas antes de o bloqueio existir. A sessão recém-aberta é encerrada na hora.
+        const { data: prof } = await client.from('profiles').select('is_active').eq('id', data.session.user.id).maybeSingle();
+        if (prof && prof.is_active === false) {
+          await client.auth.signOut();
+          throw new ValidationError(INACTIVE_MESSAGE);
+        }
         return data.session;
       },
       // O próprio usuário troca a senha: confere a senha atual antes (quem está no teclado é o dono da conta).
@@ -214,8 +241,16 @@ export function createSupabaseAdapter(client, { now = () => new Date() } = {}) {
         return () => data.subscription.unsubscribe();
       },
       async getProfile(userId) {
-        const row = await run(client.from('profiles').select('full_name, role, username').eq('id', userId).maybeSingle());
-        return { fullName: row?.full_name ?? '', role: row?.role ?? 'consulta', username: row?.username ?? '' };
+        const row = await run(
+          client.from('profiles').select('full_name, role, username, is_active, must_change_password').eq('id', userId).maybeSingle()
+        );
+        return {
+          fullName: row?.full_name ?? '',
+          role: row?.role ?? 'consulta',
+          username: row?.username ?? '',
+          isActive: row?.is_active !== false,
+          mustChangePassword: row?.must_change_password === true,
+        };
       },
     },
 
@@ -236,6 +271,10 @@ export function createSupabaseAdapter(client, { now = () => new Date() } = {}) {
       },
       async setPassword(id, password) {
         await run(client.rpc('admin_set_password', { p_id: id, p_password: text(password) }));
+      },
+      // Desativa/reativa a conta sem apagar nada (o banco também bloqueia o login e encerra as sessões).
+      async setActive(id, active) {
+        return rowToUser(await run(client.rpc('admin_set_active', { p_id: id, p_active: !!active })));
       },
       async remove(id) {
         await run(client.rpc('admin_delete_user', { p_id: id }));

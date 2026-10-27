@@ -1,5 +1,6 @@
 // Cálculos do dashboard e relatórios — funções puras sobre os dados em memória.
-import { STATUS_ORDER } from '../lib/status.js';
+import { LONG_LOAN_HOURS, STATUS_ORDER } from '../lib/status.js';
+import { hoursSince } from '../lib/format.js';
 
 const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -82,6 +83,14 @@ export function computeStats({ assets, events, sectors, now = new Date() }) {
     radiosLoaned: activeLoans.filter((l) => l.category === 'radio').length,
     chairsLoaned: activeLoans.filter((l) => l.category === 'wheelchair').length,
   };
+}
+
+// Empréstimos críticos: fora há MAIS de `limitHours` (12 h por padrão), os mais antigos primeiro.
+// Recebe o relógio de fora porque o painel reavalia a cada minuto sem recalcular as demais estatísticas.
+export function overdueLoans(loans, now = new Date(), limitHours = LONG_LOAN_HOURS) {
+  return loans
+    .filter((l) => hoursSince(l.since, now) > limitHours)
+    .sort((a, b) => a.since.localeCompare(b.since));
 }
 
 // Pareia cada check-out com o check-in seguinte do mesmo ativo.

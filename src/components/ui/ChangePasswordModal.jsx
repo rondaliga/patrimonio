@@ -7,8 +7,10 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 
 // "Alterar minha senha": vale para qualquer perfil e pede a senha atual.
-export default function ChangePasswordModal({ open, onClose }) {
-  const { changePassword } = useAuth();
+// `forced`: troca obrigatória do primeiro acesso (senha temporária) — modal bloqueante, sem cancelar;
+// a única saída além de trocar a senha é "Sair".
+export default function ChangePasswordModal({ open, onClose = () => {}, forced = false }) {
+  const { changePassword, signOut } = useAuth();
   const toast = useToast();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -38,7 +40,7 @@ export default function ChangePasswordModal({ open, onClose }) {
     setBusy(true);
     try {
       await changePassword(current, next);
-      toast.success('Senha alterada.');
+      toast.success(forced ? 'Senha definida. Bem-vindo(a)!' : 'Senha alterada.');
       onClose();
     } catch (err) {
       setErrors(err.fields && Object.keys(err.fields).length ? err.fields : { form: err.message });
@@ -48,9 +50,14 @@ export default function ChangePasswordModal({ open, onClose }) {
   };
 
   return (
-    <Modal open={open} title="Alterar minha senha" onClose={onClose} size="sm">
+    <Modal open={open} title={forced ? 'Defina a sua nova senha' : 'Alterar minha senha'} onClose={onClose} size="sm" dismissible={!forced}>
       <form onSubmit={submit} noValidate className="space-y-3">
-        <Field label="Senha atual" htmlFor="pw-current" error={errors.current}>
+        {forced && (
+          <p className="rounded bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+            Este é o seu primeiro acesso (ou a sua senha foi redefinida pelo administrador). Por segurança, escolha uma senha só sua para continuar.
+          </p>
+        )}
+        <Field label={forced ? 'Senha temporária (a que você recebeu)' : 'Senha atual'} htmlFor="pw-current" error={errors.current}>
           <PasswordInput id="pw-current" value={current} onChange={setCurrent} error={errors.current} autoComplete="current-password" autoFocus />
         </Field>
         <Field label="Nova senha" htmlFor="pw-new" error={errors.password} hint="Pelo menos 8 caracteres.">
@@ -61,7 +68,11 @@ export default function ChangePasswordModal({ open, onClose }) {
         </Field>
         <FormError message={errors.form} />
         <div className="flex justify-end gap-2 pt-1">
-          <button type="button" className="btn btn-secondary" onClick={onClose} disabled={busy}>Cancelar</button>
+          {forced ? (
+            <button type="button" className="btn btn-secondary" onClick={signOut} disabled={busy}>Sair</button>
+          ) : (
+            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={busy}>Cancelar</button>
+          )}
           <button type="submit" className="btn btn-primary" disabled={busy}>Salvar senha</button>
         </div>
       </form>

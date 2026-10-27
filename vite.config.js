@@ -22,6 +22,7 @@ export default defineConfig({
           if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react';
           if (id.includes('@supabase')) return 'supabase';
           if (id.includes('lucide-react')) return 'icons';
+          if (id.includes('html5-qrcode')) return 'qr-scanner'; // só baixa ao abrir o leitor de QR
           return undefined;
         },
       },

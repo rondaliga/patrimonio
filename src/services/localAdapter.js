@@ -4,6 +4,8 @@
 import { STATUS } from '../lib/status.js';
 import { slugify as slug } from '../lib/format.js';
 import { buildSeed } from './seed.js';
+import { dayRange, fold } from '../lib/format.js';
+import { actorSearchText } from '../lib/audit.js';
 import { createStorage } from './storage.js';
 import {
   ValidationError,
@@ -111,6 +113,18 @@ export function createLocalAdapter({ storage = createStorage(), now = () => new 
     // Eventos com id maior que `id` (usado para buscar só o que acabou de acontecer).
     async eventsAfter(id) {
       return read().events.filter((e) => e.id > id);
+    },
+
+    // Mesmo contrato do adaptador Supabase: retiradas/devoluções filtradas por responsável e período.
+    async searchMovements({ q = '', from = '', to = '', limit = 50, offset = 0 } = {}) {
+      const { start, end } = dayRange(from, to);
+      const term = fold(q).trim();
+      return read()
+        .events.filter((e) => e.type === 'checkout' || e.type === 'checkin')
+        .filter((e) => (!start || e.at >= start) && (!end || e.at <= end))
+        .filter((e) => !term || fold(actorSearchText(e)).includes(term))
+        .sort((a, b) => b.at.localeCompare(a.at) || b.id - a.id)
+        .slice(offset, offset + limit);
     },
 
     async allEvents() {

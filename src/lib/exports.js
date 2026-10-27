@@ -38,5 +38,7 @@ export function eventColumns({ sectorName, getAsset, describeEvent }) {
     { label: 'Responsável', value: (e) => e.user ?? '' },
     { label: 'Setor', value: (e) => (e.sectorId ? sectorName(e.sectorId) : '') },
     { label: 'Observação', value: (e) => e.note ?? '' },
+    // quem registrou a ação no sistema (≠ "Responsável", que é quem retirou/devolveu o ativo)
+    { label: 'Registrado por', value: (e) => e.actorUsername || e.actorName || '' },
   ];
 }
