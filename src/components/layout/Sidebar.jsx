@@ -39,7 +39,7 @@ export default function Sidebar({ path, open, onClose, counts, showUsers = false
         <div className="flex items-center gap-2 px-5 py-4 text-white">
           <HeartPulse className="h-6 w-6 text-brand-100" />
           <div className="flex-1 leading-tight">
-            <p className="text-sm font-semibold">PatrimônioHosp</p>
+            <p className="text-sm font-semibold">Liga Contra o Câncer</p>
             <p className="text-[11px] text-brand-100/70">Gestão de ativos</p>
           </div>
           <button onClick={onClose} className="rounded p-1 text-slate-300 hover:bg-white/10 md:hidden" aria-label="Fechar menu">
